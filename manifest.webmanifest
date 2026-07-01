@@ -1,0 +1,13 @@
+{
+  "name": "Athena Agreements Studio",
+  "short_name": "Athena Agreements",
+  "description": "Athena Infonomics Agreements Studio: draft agreements from Athena's templates, track them, and route them for approval.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbfcfa",
+  "theme_color": "#2C2F71",
+  "icons": [
+    { "src": "icons/athena-mark.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

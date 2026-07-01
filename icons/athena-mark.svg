@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Athena Infonomics">
+  <!-- Athena brand mark: Royal Blue field with the Athena Pie motif (Golden Yellow) -->
+  <rect width="512" height="512" rx="104" fill="#2C2F71"/>
+  <!-- gold pie disc -->
+  <circle cx="256" cy="256" r="150" fill="#D99D29"/>
+  <!-- white pie wedge (upper-right quadrant) -->
+  <path d="M256 256 L256 106 A150 150 0 0 1 406 256 Z" fill="#FFFFFF"/>
+  <!-- center hole -> turns the disc into the logo's pie-chart "O" -->
+  <circle cx="256" cy="256" r="60" fill="#2C2F71"/>
+</svg>
