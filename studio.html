@@ -113,6 +113,7 @@ textarea{min-height:70px;resize:vertical}
 .rte-tool .sep{width:1px;background:var(--line);margin:2px 3px}
 .rte{border:1px solid var(--line);border-radius:0 0 8px 8px;padding:12px 14px;min-height:80px;font-size:13.5px;line-height:1.55;background:#fff;outline:none}
 .rte:focus{border-color:var(--blue);box-shadow:0 0 0 2px var(--tint)}
+.rte:empty:before{content:attr(data-ph);color:#9aa0b5;pointer-events:none}
 .rte p{margin:0 0 8px} .rte ul,.rte ol{margin:0 0 8px 22px}
 .rte table,.page table.data{border-collapse:collapse;width:100%;margin:6px 0}
 .rte table td,.rte table th,.page table.data td,.page table.data th{border:1px solid #b9bed6;padding:5px 8px;font-size:13px;vertical-align:top}
@@ -310,7 +311,7 @@ const SA_IN_CLAUSES_A = [
 <p>2.2 No expenses shall be reimbursed or deemed to be an obligation of Company unless the Consultant obtains the prior written consent of Company. To the extent any expenses are pre-approved in writing by Company, such expenses are only reimbursable if reasonably incurred and incurred in strict compliance with Company's travel and expense policy (as amended from time to time). In addition, in no event shall any such expenses include travel or commuting expenses to Company's offices or site. In addition, travel time is not billable time under this Agreement nor shall any Fees be paid with respect thereto.</p>
 <p>2.3 Except as otherwise expressly stated in this Agreement attachment hereto, the Consultant shall not be entitled to receive any other compensation or any benefits from Company.  Except as otherwise required by law, Company shall not withhold any sums from payments made to Consultant for social security or other federal, state or local tax liabilities or contributions, and all such withholdings, liabilities, and contributions shall be solely Consultant's responsibility and obligation. The Consultant is solely responsible for all required insurance coverages (including coverage for its employees or consultants), the withholding and payment of all applicable employment and payroll taxes, if any, and all reporting and recordkeeping requirements. The Consultant shall indemnify, defend and hold harmless Company, its directors and officers from any claims by a third party as to any violation of the foregoing or claims for compensation from Company.</p>` },
   { id:"relationship", title:"3. RELATIONSHIP OF PARTIES:", on:true, body:`
-<p>It is understood by the parties that the consultant is an independent contractor with respect to the Company, and not an employee/agent of the Company. The Consultant will co-ordinate with {{COORD}}, to execute the agreed upon services.</p>
+<p>It is understood by the parties that the consultant is an independent contractor with respect to the Company, and not an employee/agent of the Company. The Consultant will co-ordinate with {{COORD}} - Athena Infonomics or such other Company's designate, to execute the agreed upon services.</p>
 <p>3.1 Nothing in this Agreement shall in any way be construed to constitute Consultant as an agent, employee or representative of Company, but Consultant shall perform the Services hereunder as an independent contractor. Consultant acknowledges and agrees that it will use its own discretion in performing the tasks assigned, within the scope of work specified by Company. Consultant further agrees to indemnify Company and hold it harmless to the extent of any obligation imposed on Company: (i) to pay withholding taxes or similar items or any other statutory obligations/requirements or (ii) resulting from Consultant's being determined not to be an independent contractor. Consultant further acknowledges and agrees to the following:</p>
 <p style="margin-left:22px">(a) While providing Services, Consultant is, and shall at, all times be and remain, an independent contractor;</p>
 <p style="margin-left:22px">(b) Nothing in this Agreement or otherwise shall be construed as identifying Consultant as an employee, agent or legal representative of Company or any of Company's related or affiliated entities during the term for any purpose whatsoever;</p>
@@ -1750,7 +1751,7 @@ function panelFinalise(){
   </div>`;
 }
 /* ---- inline WYSIWYG editor: toolbar + contenteditable bound to a draft path ---- */
-function rte(path, html){
+function rte(path, html, ph){
   return `<div class="rte-tool" data-rtefor="${path}">
     <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
     <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
@@ -1767,7 +1768,7 @@ function rte(path, html){
     <span class="sep"></span>
     <button type="button" data-cmd="removeFormat" title="Clear formatting">✕ Format</button>
   </div>
-  <div class="rte" contenteditable="true" data-edit="${path}">${html}</div>`;
+  <div class="rte" contenteditable="true" data-edit="${path}"${ph?` data-ph="${esc(ph)}"`:""}>${html}</div>`;
 }
 function F(name){ return esc(draft.fields[name]||""); }
 function usesToken(tok){ return (draft.clauses||[]).some(c=>c.body.indexOf("{{"+tok+"}}")>=0); }
@@ -1844,11 +1845,11 @@ function panelScope(){
       <div class="field full"><input type="text" data-scope="title" value="${esc(s.title)}"></div></fieldset>
     <fieldset class="fieldset"><legend>Key areas</legend>
       <div class="field full"><label>Heading</label><input type="text" data-scope="h_brief" value="${esc(s.h_brief)}"></div>
-      <div class="field full"><textarea data-scope="brief" placeholder="Brief description of the project">${esc(s.brief)}</textarea></div>
+      <div class="field full">${rte("scope:brief", s.brief||"", "Brief description of the project — use the toolbar for bullets, numbering, bold, etc.")}</div>
       <div class="field full"><label>Heading</label><input type="text" data-scope="h_scope" value="${esc(s.h_scope)}"></div>
-      <div class="field full"><textarea data-scope="scope" placeholder="Scope of the work">${esc(s.scope)}</textarea></div>
+      <div class="field full">${rte("scope:scope", s.scope||"", "Scope of the work")}</div>
       <div class="field full"><label>Heading</label><input type="text" data-scope="h_role" value="${esc(s.h_role)}"></div>
-      <div class="field full"><textarea data-scope="role" placeholder="The consultant's role">${esc(s.role)}</textarea></div>
+      <div class="field full">${rte("scope:role", s.role||"", "The consultant's role")}</div>
     </fieldset>
     <fieldset class="fieldset"><legend>Deliverables &amp; timelines</legend>
       <div class="field full"><label>Section heading</label><input type="text" data-scope="h_deliv" value="${esc(s.h_deliv)}"></div>
@@ -1870,9 +1871,12 @@ function scopeToHTML(){
   const s=draft.scope; if(!s) return "";
   const fill=(v)=> (v&&String(v).trim())? esc(v).replace(/\n/g,"<br>") : `<span class="fill">____________</span>`;
   let h="";
-  h+=`<p><b>${esc(s.h_brief)}</b></p><p>${fill(s.brief)}</p>`;
-  h+=`<p><b>${esc(s.h_scope)}</b></p><p>${fill(s.scope)}</p>`;
-  h+=`<p><b>${esc(s.h_role)}</b></p><p>${fill(s.role)}</p>`;
+  // Key areas are now rich text (bullets/numbering/bold/etc.) — output the HTML directly
+  // (sanitised), falling back to a blank line when empty.
+  const richFill=(v)=>{ const t=String(v||"").replace(/<[^>]*>/g,"").trim(); return t ? (typeof sanitizeHTML==="function"?sanitizeHTML(v):v) : '<p><span class="fill">____________</span></p>'; };
+  h+=`<p><b>${esc(s.h_brief)}</b></p>`+richFill(s.brief);
+  h+=`<p><b>${esc(s.h_scope)}</b></p>`+richFill(s.scope);
+  h+=`<p><b>${esc(s.h_role)}</b></p>`+richFill(s.role);
   h+=`<p><b>${esc(s.h_deliv)}</b></p>`;
   h+=`<table class="data"><thead><tr>${s.cols.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${s.rows.map(r=>`<tr>${s.cols.map((c,ci)=>`<td>${esc(r[ci]||"")}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   h+=`<p><b>${esc(s.h_comp)}</b></p>`;
@@ -1886,7 +1890,7 @@ function scopeToHTML(){
 }
 /* ---- editor wiring (fields, rich editors, clause/annex controls) ---- */
 let CLAUSE_SEQ=0;
-function setBodyPath(path, html){ const [k,i]=path.split(":"); if(k==="clauses"&&draft.clauses[+i]) draft.clauses[+i].body=html; else if(k==="annex"&&draft.annex[+i]) draft.annex[+i].body=html; }
+function setBodyPath(path, html){ const [k,i]=path.split(":"); if(k==="clauses"&&draft.clauses[+i]) draft.clauses[+i].body=html; else if(k==="annex"&&draft.annex[+i]) draft.annex[+i].body=html; else if(k==="scope"&&draft.scope) draft.scope[i]=html; }
 function wirePanel(){
   // structured fields
   document.querySelectorAll("[data-f]").forEach(el=>{
@@ -2158,7 +2162,8 @@ goDashboard();
 function getDraft(){ return draft; }
 function loadDraft(obj, panel){ if(obj && obj.templateKey && tmpl(obj.templateKey)){
     // sanitise any stored clause/annexure HTML before it is rendered/exported
-    try{ (obj.clauses||[]).forEach(c=>{ c.body=sanitizeHTML(c.body); }); (obj.annex||[]).forEach(a=>{ a.body=sanitizeHTML(a.body); }); }catch(e){}
+    try{ (obj.clauses||[]).forEach(c=>{ c.body=sanitizeHTML(c.body); }); (obj.annex||[]).forEach(a=>{ a.body=sanitizeHTML(a.body); });
+      if(obj.scope){ ["brief","scope","role"].forEach(k=>{ if(typeof obj.scope[k]==="string") obj.scope[k]=sanitizeHTML(obj.scope[k]); }); } }catch(e){}
     draft=obj; activePanel=(panel==="finalise"?"finalise":"parties"); showView("editor");
     const t=tmpl(draft.templateKey); $("crumb").innerHTML=esc(t.group)+" › <b>"+esc(t.file)+"</b>"; renderSidenav(); renderPanel(); }
   else { goDashboard(); } }
