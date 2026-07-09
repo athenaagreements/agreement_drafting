@@ -1,7 +1,7 @@
 /* Agreement Studio — service worker.
    Caches the app shell so it installs and launches like an app.
    IMPORTANT: never caches your Supabase API responses (those stay live). */
-const VERSION = "athena-agreements-v27";
+const VERSION = "athena-agreements-v28";
 const SHELL = [
   "./", "./index.html", "./studio.html", "./manifest.webmanifest",
   "./app.js", "./logo.js", "./docgen.js", "./agreement.js", "./config.js",
@@ -42,16 +42,16 @@ self.addEventListener("fetch", e=>{
       const net=fetch(req).then(r=>{ if(r&&(r.ok||r.type==="opaque")) c.put(req,r.clone()); return r; }).catch(()=>hit);
       return hit||net; })); return;
   }
-  // same-origin static files: cache-first, network fallback
+  // same-origin static files: NETWORK-FIRST so a deploy shows up on a normal refresh
+  // (cache is only a fallback when offline). Keeps installable/offline behaviour intact.
   if(url.origin===self.location.origin){
     e.respondWith((async()=>{
-      const cached = await caches.match(req);
-      if(cached) return cached;
       try{
         const r = await fetch(req);
         if(r && r.ok){ const cp=r.clone(); caches.open(VERSION).then(c=>c.put(req,cp)); }
         return r;
       }catch(_){
+        const cached = await caches.match(req);
         return cached || new Response("Offline", {status:503, statusText:"Offline"});
       }
     })());
