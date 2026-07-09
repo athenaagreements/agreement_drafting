@@ -81,7 +81,7 @@ textarea{min-height:70px;resize:vertical}
 .page{background:#fff;max-width:816px;margin:0 auto;padding:64px 72px 72px;position:relative;box-shadow:0 3px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.55}
 .page .rh{position:absolute;top:20px;left:72px}
 .page .rh img{height:34px}
-.page .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:58%;opacity:.55;pointer-events:none;z-index:0}
+.page .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60%;opacity:.9;pointer-events:none;z-index:0}
 .page .wm img{width:100%;display:block}
 .page .pgcontent{position:relative;z-index:1}
 .page .doc-title{text-align:center;font-size:19px;font-weight:900;color:var(--blue);letter-spacing:.5px;margin:42px 0 6px;text-transform:uppercase}
@@ -183,25 +183,20 @@ textarea{min-height:70px;resize:vertical}
    with only the variable items as {{merge}} fields.
    ============================================================ */
 const APP_LOGO = (window.APP_LOGO_DATAURL) || "";
-// Document watermark — the Athena pie-mark in light grey, centred behind the text.
-// Same on every organisation's paperwork. Defined once here and used by both the
-// on-screen preview (as an <img>) and the Word export (rasterised to PNG).
-const WATERMARK_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
-  + '<circle cx="256" cy="256" r="150" fill="#CDCFDA"/>'
-  + '<path d="M256 256 L256 106 A150 150 0 0 1 406 256 Z" fill="#FFFFFF"/>'
-  + '<circle cx="256" cy="256" r="60" fill="#FFFFFF"/></svg>';
-const WATERMARK_DATAURL = "data:image/svg+xml;base64," + btoa(WATERMARK_SVG);
-// Rasterise to PNG once at load so the Word export (which needs raster bytes) has it ready.
+// Document watermark — the team's artwork in icons/Water Mark.png (same on every
+// organisation's paperwork). Used by the on-screen preview (as an <img>) and the Word
+// export (rasterised to raw PNG bytes at load, since docx needs bytes not a URL).
+const WATERMARK_URL = "icons/Water%20Mark.png";
 let WATERMARK_PNG = "";
 (function(){ try{
   const img = new Image();
   img.onload = function(){ try{
-    const c = document.createElement("canvas"); c.width = 512; c.height = 512;
-    c.getContext("2d").drawImage(img, 0, 0, 512, 512);
+    const w = img.naturalWidth||1024, h = img.naturalHeight||1024;
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
     WATERMARK_PNG = c.toDataURL("image/png");
   }catch(e){} };
-  img.src = WATERMARK_DATAURL;
+  img.src = WATERMARK_URL;
 }catch(e){} })();
 const $ = (id)=>document.getElementById(id);
 const esc = (s)=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -2016,7 +2011,7 @@ function buildPageHTML(){
   const lh=letterhead(draft.entity);
   const foot=`<div class="rf"><div class="lhbar"></div><div class="fn">${esc(lh.name)}</div>${lh.lines.map(l=>`<div>${esc(l)}</div>`).join("")}</div>`;
   return `<div class="page"><div class="rh"><img src="${APP_LOGO}" alt="Athena Infonomics"></div>
-    <div class="wm"><img src="${WATERMARK_DATAURL}" alt=""></div>
+    <div class="wm"><img src="${WATERMARK_URL}" alt=""></div>
     <div class="pgcontent">
       <div class="doc-title">${esc(draft.docTitle)}</div>
       ${docBodyHTML()}
