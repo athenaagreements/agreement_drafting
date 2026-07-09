@@ -139,6 +139,7 @@ async function detail(kind, id){
       <div class="spacer"></div>
       <label style="margin:0">Status</label>
       <select id="ngStatus" style="width:auto">${["open","under_review","agreed","approved","executed","closed"].map(s=>`<option ${neg.status===s?'selected':''}>${s}</option>`).join("")}</select>
+      <button class="btn sm" id="ngDelete" title="Delete this review" style="color:#a3322a;border-color:#e4b4b4">🗑 Delete</button>
     </div>
     <div class="row wrap" style="margin-top:8px;align-items:center">
       <label style="margin:0">Agreement No.</label>
@@ -158,6 +159,12 @@ async function detail(kind, id){
   $("ngAgnoSave").addEventListener("click",async()=>{
     const { error }=await sb().from("negotiations").update({ agreement_no:$("ngAgno").value.trim()||null, updated_at:new Date().toISOString() }).eq("id",id);
     if(error){ alert(error.message); return; } window.OPS.flashTop("Agreement number saved ✓");
+  });
+  // Delete this review — always two-step (goes to an approver unless the user is exempt).
+  $("ngDelete").addEventListener("click",()=>{
+    if(!confirm('Delete the review "'+(neg.title||"")+'"? This also removes its versions and comments.')) return;
+    window.OPS.gateThen({ kind:"negotiation.delete", title:'Delete review: '+(neg.title||""),
+      target_table:"negotiations", target_id:id, doneMsg:"Review deleted" }, r=>{ if(r && r.applied) list(kind); });
   });
 
   renderVersions(kind, neg, vers);
