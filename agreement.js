@@ -118,7 +118,7 @@ async function viewDetail(id){
   // The drafter (owner) now owns the closing steps: assign number → download → mark executed.
   const canExecute = (owner || isApprover()) && r.status==="approved";
   const canNumber  = (owner || isApprover()) && r.status==="approved";
-  const canDownload= (owner || isApprover()) && (r.status==="approved" || isExec);
+  const canDownload= (owner || isApprover()) && (r.status==="approved" || isExec) && !!r.data;
   const m=$("main");
   m.innerHTML=`<button class="btn sm" id="back">← Back</button>
     <div class="card" style="margin-top:12px">
@@ -152,8 +152,8 @@ async function viewDetail(id){
   if($("approve")) $("approve").addEventListener("click",()=>runRpc("approve_agreement",{p_id:r.id,p_note:null},r.id));
   if($("reject")) $("reject").addEventListener("click",()=>{ const note=prompt("Reason for rejection / changes requested:"); if(note===null) return; runRpc("reject_agreement",{p_id:r.id,p_note:note||null},r.id); });
   if($("getdoc")) $("getdoc").addEventListener("click",()=>{
-    window.OPS.flashTop("Opening the document — use the Word or Quick PDF button inside to download");
-    viewStudio(r);
+    window.OPS.flashTop("Opening the Save, download & submit page…");
+    viewStudio(r, {panel:"finalise"});
   });
   if($("execute")) $("execute").addEventListener("click",()=>{
     if(!r.agreement_no){ alert("Please assign an Agreement Number (and click “Save number”) before marking this agreement executed."); const el=$("agNo"); if(el) el.focus(); return; }
@@ -272,8 +272,10 @@ async function viewAudit(){
 
 /* ---------- embedded Studio document editor ---------- */
 let currentEdit=null;
-function viewStudio(rec){
+let studioOpenPanel=null;   // which studio panel to open on (e.g. "finalise" for a download)
+function viewStudio(rec, opts){
   currentEdit = rec || null;
+  studioOpenPanel = (opts && opts.panel) || null;
   window.OPS.currentTool="new"; window.OPS.renderNav();
   const m=$("main");
   // Full-bleed wrapper: header row + iframe share the same 38px (≈1cm) side gutter, so the
@@ -285,9 +287,21 @@ function viewStudio(rec){
         <div class="spacer"></div>
         <button class="btn sm" id="stClose">${rec?"← Back to agreement":"← Back to list"}</button>
       </div>
-      <iframe id="studioFrame" title="Document editor" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+      <div style="position:relative;height:calc(100vh - 150px)">
+        <div id="stLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--soft-green);border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:14px;z-index:2;transition:opacity .35s ease">
+          <div style="text-align:center"><div style="font-size:24px;margin-bottom:8px">📄</div>Opening the document…</div>
+        </div>
+        <iframe id="studioFrame" title="Document editor" style="position:absolute;inset:0;width:100%;height:100%;border:1px solid var(--line);border-radius:10px;background:#fff;opacity:0;transition:opacity .35s ease"></iframe>
+      </div>
     </div>`;
-  $("studioFrame").src = "studio.html?ts="+Date.now();
+  const f=$("studioFrame");
+  // Fade the editor in once it has loaded AND had a moment to render the requested panel,
+  // so the switch feels smooth instead of flashing the template gallery first.
+  f.addEventListener("load",()=>{ setTimeout(()=>{
+    if($("studioFrame")) $("studioFrame").style.opacity="1";
+    const l=$("stLoading"); if(l){ l.style.opacity="0"; setTimeout(()=>{ if(l&&l.parentNode) l.parentNode.removeChild(l); },380); }
+  }, 430); });
+  f.src = "studio.html?ts="+Date.now();
   $("stClose").addEventListener("click",()=>closeStudio());
 }
 function closeStudio(){
@@ -357,7 +371,7 @@ window.addEventListener("message",function(ev){
   if(msg.type==="app-ready"){
     // Carry the assigned agreement number into the document so it prints top-left.
     const d = currentEdit ? Object.assign({}, currentEdit.data||{}, { agreementNo: currentEdit.agreement_no || (currentEdit.data&&currentEdit.data.agreementNo) || "" }) : null;
-    f.contentWindow.postMessage({type:"app-load", draft: d}, "*"); sendStudioReviewers(f); sendStudioOverrides(f);
+    f.contentWindow.postMessage({type:"app-load", draft: d, panel: studioOpenPanel}, "*"); studioOpenPanel=null; sendStudioReviewers(f); sendStudioOverrides(f);
   }
   else if(msg.type==="app-save"){ saveStudioDraft(msg.draft); }
   else if(msg.type==="app-submit"){ submitStudioDraft(msg, f); }

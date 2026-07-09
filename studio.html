@@ -2156,15 +2156,15 @@ goDashboard();
 
 /* Parent app contract: app-ready / app-load / app-get / app-save / app-close */
 function getDraft(){ return draft; }
-function loadDraft(obj){ if(obj && obj.templateKey && tmpl(obj.templateKey)){
+function loadDraft(obj, panel){ if(obj && obj.templateKey && tmpl(obj.templateKey)){
     // sanitise any stored clause/annexure HTML before it is rendered/exported
     try{ (obj.clauses||[]).forEach(c=>{ c.body=sanitizeHTML(c.body); }); (obj.annex||[]).forEach(a=>{ a.body=sanitizeHTML(a.body); }); }catch(e){}
-    draft=obj; activePanel="parties"; showView("editor");
+    draft=obj; activePanel=(panel==="finalise"?"finalise":"parties"); showView("editor");
     const t=tmpl(draft.templateKey); $("crumb").innerHTML=esc(t.group)+" › <b>"+esc(t.file)+"</b>"; renderSidenav(); renderPanel(); }
   else { goDashboard(); } }
 if(window.parent && window.parent!==window){
   window.addEventListener("message",function(ev){ const m=ev.data||{};
-    if(m.type==="app-load"){ if(m.draft) loadDraft(m.draft); }
+    if(m.type==="app-load"){ if(m.draft) loadDraft(m.draft, m.panel); }
     else if(m.type==="app-get"){ window.parent.postMessage({type:"app-draft",draft:getDraft()},"*"); }
     else if(m.type==="app-reviewers"){ REVIEWERS=m.reviewers||[]; if(activePanel==="finalise") renderPanel(); }
     else if(m.type==="app-overrides"){ TEMPLATE_OVERRIDES=sanitizeOverrides(m.overrides||{}); CAN_EDIT_TEMPLATES=!!m.canEditTemplates;

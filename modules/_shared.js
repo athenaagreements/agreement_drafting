@@ -124,8 +124,7 @@ function makeRegistry(cfg){
           ${rec && window.OPS.canDelete()?'<button class="btn sm" id="rqDel" style="color:#a3322a;border-color:#e4b4b4">Delete</button>':''}
         </div>
         <div class="err" id="rqErr"></div>
-      </div>
-      <div id="rqApproval"></div>`;
+      </div>`;
     if(cfg.logView && rec && window.OPS.access){ window.OPS.access.log(cfg.table, rec.id, rec[cfg.fields[0].key]||""); }
     // dependent State -> District dropdowns
     $("main").querySelectorAll('select[data-depends]').forEach(dsel=>{

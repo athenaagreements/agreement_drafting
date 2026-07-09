@@ -23,8 +23,6 @@ async function applyAction(kind, payload, target_table, target_id){
       return await sb().from("template_overrides").delete().eq("template_key", target_id);
     case "agreement.delete":
       return await sb().from("agreements").delete().eq("id", target_id);
-    case "agreement.edit":
-      return await sb().from("agreements").update(payload.patch||{}).eq("id", target_id);
     case "agreement.execute":
       return await sb().rpc("mark_executed", { p_id:target_id, p_note:payload.note||null });
     case "executed.create":
