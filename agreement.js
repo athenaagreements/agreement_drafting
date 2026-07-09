@@ -267,13 +267,15 @@ function viewStudio(rec){
   currentEdit = rec || null;
   window.OPS.currentTool="new"; window.OPS.renderNav();
   const m=$("main");
-  m.innerHTML = `<div class="row" style="margin-bottom:8px;align-items:center">
-      <div class="eyebrow">${rec?"Edit document":"New agreement"}</div>
-      <span class="muted" style="margin-left:8px">${rec?esc(rec.title||""):"Pick a template, fill it in, then “Save to cloud” — it’s added to Agreements automatically."}</span>
-      <div class="spacer"></div>
-      <button class="btn sm" id="stClose">${rec?"← Back to agreement":"← Back to list"}</button>
-    </div>
-    <div style="position:relative;left:50%;right:50%;width:100vw;margin-left:-50vw;margin-right:-50vw;padding:0 10px;box-sizing:border-box">
+  // Full-bleed wrapper: header row + iframe share the same 38px (≈1cm) side gutter, so the
+  // "New agreement" label lines up with the iframe's left edge and "Back to list" with its right.
+  m.innerHTML = `<div style="position:relative;left:50%;right:50%;width:100vw;margin-left:-50vw;margin-right:-50vw;padding:0 38px;box-sizing:border-box">
+      <div class="row" style="margin-bottom:8px;align-items:center">
+        <div class="eyebrow">${rec?"Edit document":"New agreement"}</div>
+        <span class="muted" style="margin-left:8px">${rec?esc(rec.title||""):"Pick a template, fill it in, then “Save to cloud” — it’s added to Agreements automatically."}</span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="stClose">${rec?"← Back to agreement":"← Back to list"}</button>
+      </div>
       <iframe id="studioFrame" title="Document editor" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
     </div>`;
   $("studioFrame").src = "studio.html?ts="+Date.now();
