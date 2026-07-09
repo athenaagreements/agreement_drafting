@@ -49,14 +49,15 @@ h1,h2,h3,h4{margin:0}
 .card .ds{font-size:12px;color:var(--muted);flex:1}
 .card .acts{display:flex;gap:7px;margin-top:4px}
 /* editor */
-.editor{display:grid;grid-template-columns:220px 1fr;gap:0;min-height:calc(100vh - 60px)}
-.sidenav{background:#fff;border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
+/* Fixed-height editor: the left nav stays put and ONLY the drafting panel scrolls. */
+.editor{display:grid;grid-template-columns:220px 1fr;gap:0;height:calc(100vh - 57px);overflow:hidden}
+.sidenav{background:#fff;border-right:1px solid var(--line);padding:16px 10px;height:100%;overflow-y:auto}
 .navitem{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
 .navitem:hover{background:var(--tint)}
 .navitem.active{background:var(--blue);color:#fff}
 .navitem .num{display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;border-radius:50%;background:var(--tint);color:var(--blue);font-size:11px}
 .navitem.active .num{background:rgba(255,255,255,.25);color:#fff}
-.panelHost{padding:22px 26px}
+.panelHost{padding:22px 26px 64px;height:100%;overflow-y:auto}
 .panel h2{font-size:20px;color:var(--blue);margin-bottom:4px}
 .panel .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
 .fieldset{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}

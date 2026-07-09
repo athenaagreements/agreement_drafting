@@ -1,7 +1,7 @@
 /* Agreement Studio — service worker.
    Caches the app shell so it installs and launches like an app.
    IMPORTANT: never caches your Supabase API responses (those stay live). */
-const VERSION = "athena-agreements-v35";
+const VERSION = "athena-agreements-v36";
 const SHELL = [
   "./", "./index.html", "./studio.html", "./manifest.webmanifest",
   "./app.js", "./logo.js", "./docgen.js", "./agreement.js", "./config.js",
