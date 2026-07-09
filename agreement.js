@@ -76,7 +76,7 @@ function viewForm(existing){
     </div>`;
   listProfiles().then(ps=>{
     const approvers=ps.filter(p=>p.role==="approver"||p.role==="admin");
-    $("fApp").innerHTML = '<option value="">— none —</option>'+approvers.map(p=>`<option value="${p.id}" ${e.assigned_approver===p.id?'selected':''}>${esc(p.full_name||p.email)} (${p.role})</option>`).join("");
+    $("fApp").innerHTML = '<option value="">— none —</option>'+approvers.map(p=>`<option value="${p.id}" ${e.assigned_approver===p.id?'selected':''}>${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("");
   });
   $("impBtn").addEventListener("click",()=>{ $("jsonImport").onchange=ev=>{ const f=ev.target.files[0]; if(!f)return;
     const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); $("fData").value=JSON.stringify(o.draft||o,null,2);
@@ -179,7 +179,7 @@ async function viewTeam(){
   $("teamHost").innerHTML=`<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th style="text-align:center">Approvals required</th><th>Joined</th></tr></thead><tbody>
     ${ps.map(p=>`<tr><td>${esc(p.full_name||"")}</td><td>${esc(p.email||"")}</td>
       <td><select data-uid="${p.id}" ${p.id===me.id?'disabled':''}>
-        ${["admin","approver","drafter","viewer"].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${r}</option>`).join("")}
+        ${["admin","approver","drafter","viewer"].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${esc(window.OPS.roleLabel(r))}</option>`).join("")}
       </select></td>
       <td style="text-align:center"><input type="checkbox" style="width:auto" data-exempt="${p.id}" ${p.approval_exempt?'':'checked'} title="Ticked = this person's actions must be approved by someone else before they take effect"></td>
       <td class="muted">${fmt(p.created_at)}</td></tr>`).join("")}
@@ -206,7 +206,7 @@ async function viewTeam(){
     if(!members.length){ $("permHost").innerHTML='<div class="muted">No non-admin members yet.</div>'; return; }
     const g=groups.find(x=>x.key===$("permSection").value)||groups[0];
     $("permHost").innerHTML=`<div style="overflow:auto"><table><thead><tr><th>Member</th>${g.tools.map(t=>`<th style="text-align:center">${esc(t.label)}</th>`).join("")}</tr></thead>
-      <tbody>${members.map(p=>`<tr><td><b>${esc(p.full_name||p.email)}</b><br><span class="muted">${esc(p.role)}</span></td>
+      <tbody>${members.map(p=>`<tr><td><b>${esc(p.full_name||p.email)}</b><br><span class="muted">${esc(window.OPS.roleLabel(p.role))}</span></td>
         ${g.tools.map(t=>`<td style="text-align:center"><input type="checkbox" style="width:auto" data-u="${p.id}" data-t="${t.key}" ${working.has(p.id+"|"+t.key)?"checked":""}></td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
     $("permHost").querySelectorAll("input[type=checkbox]").forEach(cb=>cb.addEventListener("change",()=>{
       const k=cb.getAttribute("data-u")+"|"+cb.getAttribute("data-t");

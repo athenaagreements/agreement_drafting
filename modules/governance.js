@@ -46,7 +46,7 @@ window.OPS.applyAction = applyAction;
 async function pickApprover(title){
   const { data } = await sb().from("profiles").select("id,full_name,email,role").in("role",["approver","admin"]).order("full_name");
   const list = (data||[]).filter(p=>p.id!==me().id);
-  if(!list.length){ alert("No approver or admin is available to approve this yet. Ask an admin to assign approver/admin roles in Team & Access."); return null; }
+  if(!list.length){ alert("No Reviewer or Admin / Approver is available to approve this yet. Ask an admin to assign roles in Team & Access."); return null; }
   return await new Promise(resolve=>{
     const ov=document.createElement("div");
     ov.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:80;display:flex;align-items:center;justify-content:center";
@@ -54,7 +54,7 @@ async function pickApprover(title){
       <h2 style="margin:0 0 4px">Send for approval</h2>
       <p class="muted" style="margin:0 0 12px">${esc(title||"This action")} needs a second person to approve it before it takes effect.</p>
       <label>Approver</label>
-      <select id="gaSel" style="width:100%">${list.map(p=>`<option value="${p.id}">${esc(p.full_name||p.email)} (${esc(p.role)})</option>`).join("")}</select>
+      <select id="gaSel" style="width:100%">${list.map(p=>`<option value="${p.id}">${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("")}</select>
       <label style="margin-top:10px">Note <span class="muted">(optional)</span></label>
       <input id="gaNote" style="width:100%" placeholder="Anything the approver should know">
       <div class="row" style="margin-top:16px;justify-content:flex-end;gap:8px">

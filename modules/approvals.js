@@ -28,9 +28,15 @@ async function submit(table, id, approverId, title){
   window.OPS.refreshNotifs(); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
 }
 async function approve(table, id, title){
-  if(table==="agreements"){ const { error }=await sb().rpc("approve_agreement",{p_id:id,p_note:null}); if(error){ alert(error.message); return false; } }
-  else { const { error }=await sb().from(table).update({ approval_status:"approved", approved_by:me().id, approved_at:new Date().toISOString() }).eq("id",id); if(error){ alert(error.message); return false; } }
-  window.OPS.audit("approved",table,id,title||""); window.OPS.flashTop("Approved ✓"); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
+  let msg = "Approved ✓";
+  if(table==="agreements"){
+    const { error }=await sb().rpc("approve_agreement",{p_id:id,p_note:null}); if(error){ alert(error.message); return false; }
+    // A non-admin approver only *recommends*; an admin gives final approval. Reflect that honestly.
+    msg = window.OPS.isAdmin() ? "Approved ✓" : "Recommended — sent to an admin for final approval ✓";
+  } else {
+    const { error }=await sb().from(table).update({ approval_status:"approved", approved_by:me().id, approved_at:new Date().toISOString() }).eq("id",id); if(error){ alert(error.message); return false; }
+  }
+  window.OPS.audit("approved",table,id,title||""); window.OPS.flashTop(msg); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
 }
 async function reject(table, id, note, title){
   if(table==="agreements"){ const { error }=await sb().rpc("reject_agreement",{p_id:id,p_note:note||null}); if(error){ alert(error.message); return false; } }
@@ -49,7 +55,7 @@ async function bar(table, rec, host, refresh){
     <b>Approval:</b> ${window.OPS.statusChip(st==="submitted"?"in_review":st)} `;
   if(st==="draft"||st==="rejected"){
     html += `<span class="muted">Assign reviewer</span>
-      <select id="apApprover" style="width:auto;max-width:220px">${ps.filter(p=>p.id!==me().id).map(p=>`<option value="${p.id}">${esc(p.full_name||p.email)} (${p.role})</option>`).join("")}</select>
+      <select id="apApprover" style="width:auto;max-width:220px">${ps.filter(p=>p.id!==me().id).map(p=>`<option value="${p.id}">${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("")}</select>
       <button class="btn orange sm" id="apSubmit">Submit for review</button>`;
     if(st==="rejected" && rec.reject_note) html += `<div class="muted" style="flex-basis:100%;margin-top:6px">Rejected: ${esc(rec.reject_note)}</div>`;
   } else if(st==="submitted"){
@@ -76,16 +82,19 @@ async function reviewQueue(){
   const ps=await listProfilesCached();
   // ---- agreements (own status workflow: draft → in_review → approved/rejected → executed) ----
   (async()=>{
-    let q=sb().from("agreements").select("*").eq("status","in_review");
+    // Admins also see 'recommended' items (an approver has recommended them; an admin must
+    // finalise). Non-admin approvers only see the in_review items assigned to them.
+    let q=sb().from("agreements").select("*").in("status", admin?["in_review","recommended"]:["in_review"]);
     if(!admin) q=q.eq("assigned_approver",me().id);
     const { data }=await q; const items=(data||[]).map(r=>({table:"agreements",r}));
     if(!items.length){ $("rvAgs").innerHTML='<div class="card muted">Nothing awaiting your review.</div>'; return; }
     const titleOf=(t,r)=> r.title||"";
-    $("rvAgs").innerHTML=`<div class="card"><table><thead><tr><th>Type</th><th>Item</th><th>Submitted by</th><th></th></tr></thead>
+    $("rvAgs").innerHTML=`<div class="card"><table><thead><tr><th>Type</th><th>Item</th><th>Status</th><th>Submitted by</th><th></th></tr></thead>
       <tbody>${items.map((it,i)=>`<tr><td><span class="tag">Agreement</span></td>
         <td><b>${esc(it.r.title||"")}</b></td>
+        <td>${window.OPS.statusChip?window.OPS.statusChip(it.r.status):esc(it.r.status)}</td>
         <td>${esc(nameOf(ps, it.r.created_by))}</td>
-        <td><button class="btn green sm" data-act="approve" data-i="${i}">Approve</button>
+        <td><button class="btn green sm" data-act="approve" data-i="${i}">${admin&&it.r.status==="recommended"?"Final approve":"Approve"}</button>
             <button class="btn sm" data-act="reject" data-i="${i}" style="color:#a3322a;border-color:#e4b4b4">Reject</button>
             <button class="btn sm" data-act="open" data-i="${i}">Open</button></td></tr>`).join("")}</tbody></table></div>`;
     $("rvAgs").querySelectorAll("[data-act]").forEach(b=>b.addEventListener("click",async()=>{
@@ -119,14 +128,20 @@ async function renderActions(admin, ps){
 }
 async function approveAction(a){
   try{
-    const res=await window.OPS.applyAction(a.kind, a.payload, a.target_table, a.target_id);
-    if(res && res.error) throw new Error(res.error.message);
-    await sb().from("pending_actions").update({ status:"applied", decided_by:me().id, decided_at:new Date().toISOString(), applied_at:new Date().toISOString() }).eq("id",a.id);
+    // Storage files can't be removed from SQL, so clean up a deleted upload's file here first.
+    if(a.kind==="executed.delete" && a.payload && a.payload.file_path){
+      try{ await sb().storage.from("executed-agreements").remove([a.payload.file_path]); }catch(_){}
+    }
+    // Apply through the SECURITY DEFINER RPC: it authorises this approver, then performs the
+    // action with definer rights, marks it applied, and notifies the requester — all server-side.
+    // (Doing it client-side ran in the approver's context, where owner-keyed RLS made approved
+    //  deletes/edits silently no-op and library uploads hard-fail.)
+    const { error } = await sb().rpc("apply_pending_action", { p_id:a.id });
+    if(error) throw error;
     window.OPS.audit("approved:"+a.kind, a.target_table||"action", a.target_id||"", a.title);
-    await notify(a.requested_by, "Approved: "+a.title);
     window.OPS.flashTop("Approved & applied ✓"); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount();
   }catch(e){
-    await sb().from("pending_actions").update({ status:"failed", decided_by:me().id, decided_at:new Date().toISOString(), apply_error:String(e.message||e) }).eq("id",a.id);
+    try{ await sb().from("pending_actions").update({ status:"failed", decided_by:me().id, decided_at:new Date().toISOString(), apply_error:String(e.message||e) }).eq("id",a.id); }catch(_){}
     alert("Could not apply this action: "+(e.message||e));
   }
 }

@@ -164,7 +164,7 @@ async function afterLogin(){
 }
 function applyProfile(keepView){
   $("meEmail").textContent = profile.email || me.email;
-  $("meRole").textContent = isExternal() ? "PARTNER" : (profile.role||"drafter").toUpperCase();
+  $("meRole").textContent = isExternal() ? "Partner" : roleLabel(profile.role||"drafter");
   // Always land on the home/landing page after login so the user chooses the path forward.
   // Only an in-session refresh (e.g. clicking the role chip) keeps the current view.
   if(keepView && window.OPS.currentTool && window.OPS.currentTool!=="home" && canSee(toolByKey(window.OPS.currentTool))){
@@ -460,6 +460,11 @@ window.OPS.audit=audit; window.OPS.listProfiles=listProfiles;
 
 function statusChip(s){ return `<span class="chip ${s}">${STATUS_LABEL[s]||s}</span>`; }
 window.OPS.statusChip = statusChip;
+// Friendly role labels for a small team: the DB values stay drafter/approver/admin,
+// but we show "Reviewer" (recommends) and "Admin / Approver" (final approval).
+const ROLE_LABEL = { drafter:"Drafter", approver:"Reviewer", admin:"Admin / Approver", viewer:"Viewer" };
+function roleLabel(r){ return ROLE_LABEL[r] || (r ? (r.charAt(0).toUpperCase()+r.slice(1)) : "—"); }
+window.OPS.roleLabel = roleLabel;
 
 // ---------- file save (Word/JSON downloads) ----------
 async function saveBlob(blob, filename, mime, ext){
@@ -518,6 +523,8 @@ async function refreshReviewCount(){
   const parts=await Promise.all([
     cnt("agreements","status","in_review"),
     cnt("pending_actions","status","pending"),
+    // Admins also need a signal for items an approver recommended (awaiting final approval).
+    admin ? cnt("agreements","status","recommended") : Promise.resolve(0),
   ]);
   window.OPS.reviewCount = parts.reduce((a,b)=>a+b,0);
   renderNav();
