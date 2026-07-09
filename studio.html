@@ -50,7 +50,7 @@ h1,h2,h3,h4{margin:0}
 .card .acts{display:flex;gap:7px;margin-top:4px}
 /* editor */
 .editor{display:grid;grid-template-columns:220px 1fr;gap:0;min-height:calc(100vh - 60px)}
-.sidenav{background:#fff;border-right:1px solid var(--line);padding:16px 10px}
+.sidenav{background:#fff;border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto}
 .navitem{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
 .navitem:hover{background:var(--tint)}
 .navitem.active{background:var(--blue);color:#fff}
@@ -81,8 +81,7 @@ textarea{min-height:70px;resize:vertical}
 .page{background:#fff;max-width:816px;margin:0 auto;padding:64px 72px 72px;position:relative;box-shadow:0 3px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.55}
 .page .rh{position:absolute;top:20px;left:72px}
 .page .rh img{height:34px}
-.page .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60%;opacity:.9;pointer-events:none;z-index:0}
-.page .wm img{width:100%;display:block}
+.page .wm{position:absolute;inset:0;background-image:url("icons/Water%20Mark.png");background-repeat:repeat-y;background-position:center top;background-size:48% auto;opacity:.13;pointer-events:none;z-index:0}
 .page .pgcontent{position:relative;z-index:1}
 .page .doc-title{text-align:center;font-size:19px;font-weight:900;color:var(--blue);letter-spacing:.5px;margin:42px 0 6px;text-transform:uppercase}
 .page .doc-sub{text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px}
@@ -188,16 +187,20 @@ const APP_LOGO = (window.APP_LOGO_DATAURL) || "";
 // export (rasterised to raw PNG bytes at load, since docx needs bytes not a URL).
 const WATERMARK_URL = "icons/Water%20Mark.png";
 let WATERMARK_PNG = "";
-(function(){ try{
-  const img = new Image();
-  img.onload = function(){ try{
-    const w = img.naturalWidth||1024, h = img.naturalHeight||1024;
-    const c = document.createElement("canvas"); c.width = w; c.height = h;
-    c.getContext("2d").drawImage(img, 0, 0, w, h);
-    WATERMARK_PNG = c.toDataURL("image/png");
-  }catch(e){} };
-  img.src = WATERMARK_URL;
-}catch(e){} })();
+// Resolve once the PNG is rasterised (or fails), so the Word export can await it.
+const WATERMARK_READY = new Promise(function(resolve){
+  try{
+    const img = new Image();
+    img.onload = function(){ try{
+      const w = img.naturalWidth||1024, h = img.naturalHeight||1024;
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      c.getContext("2d").drawImage(img, 0, 0, w, h);
+      WATERMARK_PNG = c.toDataURL("image/png");
+    }catch(e){} resolve(); };
+    img.onerror = function(){ resolve(); };
+    img.src = WATERMARK_URL;
+  }catch(e){ resolve(); }
+});
 const $ = (id)=>document.getElementById(id);
 const esc = (s)=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const todayISO = ()=> new Date().toISOString().slice(0,10);
@@ -2011,7 +2014,7 @@ function buildPageHTML(){
   const lh=letterhead(draft.entity);
   const foot=`<div class="rf"><div class="lhbar"></div><div class="fn">${esc(lh.name)}</div>${lh.lines.map(l=>`<div>${esc(l)}</div>`).join("")}</div>`;
   return `<div class="page"><div class="rh"><img src="${APP_LOGO}" alt="Athena Infonomics"></div>
-    <div class="wm"><img src="${WATERMARK_URL}" alt=""></div>
+    <div class="wm"></div>
     <div class="pgcontent">
       <div class="doc-title">${esc(draft.docTitle)}</div>
       ${docBodyHTML()}
@@ -2037,9 +2040,10 @@ function saveBlob(blob, filename){ if(window.saveAs) saveAs(blob, filename);
 /* ============================================================
    EXPORT — WORD (.docx) — letterhead repeats via the section header
    ============================================================ */
-function exportWord(){
+async function exportWord(){
   setDl("Building Word document…");
   if(typeof docx==="undefined"){ setDl("Word library not loaded — check your connection and retry."); return; }
+  try{ await WATERMARK_READY; }catch(e){}   // ensure the watermark PNG is rasterised before we embed it
   const D=docx; const BLUE="2C2F71", GOLD="D99D29", CHAR="3B3838", GREY="F5F5F5", LINE="E4E6F0";
   const e=ENTITIES[draft.entity];
   function inlineRuns(node,style){ style=style||{}; let runs=[];
