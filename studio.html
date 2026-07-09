@@ -85,7 +85,8 @@ textarea{min-height:70px;resize:vertical}
 .page .rh img{height:34px}
 .page .wm{position:absolute;inset:0;background-image:url("icons/Water%20Mark.png");background-repeat:repeat-y;background-position:center top;background-size:48% auto;opacity:.13;pointer-events:none;z-index:0}
 .page .pgcontent{position:relative;z-index:1}
-.page .doc-title{text-align:center;font-size:19px;font-weight:900;color:var(--blue);letter-spacing:.5px;margin:42px 0 6px;text-transform:uppercase}
+.page .agno{font-size:12px;font-weight:800;color:var(--blue);letter-spacing:.3px;margin:0 0 4px}
+.page .doc-title{text-align:center;font-size:19px;font-weight:900;color:var(--blue);letter-spacing:.5px;margin:14px 0 6px;text-transform:uppercase}
 .page .doc-sub{text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px}
 .page p{margin:0 0 9px}
 .page .clause{margin:12px 0}
@@ -2010,6 +2011,7 @@ function buildPageHTML(){
   return `<div class="page"><div class="rh"><img src="${APP_LOGO}" alt="Athena Infonomics"></div>
     <div class="wm"></div>
     <div class="pgcontent">
+      ${draft.agreementNo?`<div class="agno">Agreement No.: ${esc(draft.agreementNo)}</div>`:""}
       <div class="doc-title">${esc(draft.docTitle)}</div>
       ${docBodyHTML()}
       ${foot}
@@ -2077,6 +2079,10 @@ async function exportWord(){
   function b64ToBytes(dataUrl){ const b64=dataUrl.split(",")[1]||""; const bin=atob(b64); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); return a; }
 
   const body=[];
+  if(draft.agreementNo){
+    body.push(new D.Paragraph({alignment:D.AlignmentType.LEFT,spacing:{after:60},
+      children:[new D.TextRun({text:"Agreement No.: "+draft.agreementNo,bold:true,color:BLUE,size:18})]}));
+  }
   body.push(new D.Paragraph({alignment:D.AlignmentType.CENTER,spacing:{before:120,after:160},
     children:[new D.TextRun({text:draft.docTitle,bold:true,color:BLUE,size:30,allCaps:true})]}));
   draft.intro.forEach(p=> htmlToParas(subst(p)).forEach(x=>body.push(x)));

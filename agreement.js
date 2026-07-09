@@ -115,7 +115,10 @@ async function viewDetail(id){
   const canApprove = adminCanDecide || approverCanDecide;
   const canReject  = (adminCanDecide || approverCanDecide);
   const approveLabel = isAdmin() ? "Approve (final)" : "Approve & recommend";
-  const canExecute = isApprover() && r.status==="approved";
+  // The drafter (owner) now owns the closing steps: assign number → download → mark executed.
+  const canExecute = (owner || isApprover()) && r.status==="approved";
+  const canNumber  = (owner || isApprover()) && r.status==="approved";
+  const canDownload= (owner || isApprover()) && (r.status==="approved" || isExec);
   const m=$("main");
   m.innerHTML=`<button class="btn sm" id="back">← Back</button>
     <div class="card" style="margin-top:12px">
@@ -131,11 +134,12 @@ async function viewDetail(id){
         ${canSubmit?'<button class="btn orange sm" id="submit">Submit for review</button>':''}
         ${canApprove?`<button class="btn green sm" id="approve">${approveLabel}</button>`:''}
         ${canReject?'<button class="btn sm" id="reject" style="color:#a3322a;border-color:#e4b4b4">Reject…</button>':''}
+        ${canDownload?'<button class="btn green sm" id="getdoc">⬇ Download document (Word / PDF)</button>':''}
         ${canExecute?'<button class="btn blue sm" id="execute">Mark executed (signed)</button>':''}
         ${r.data?'<button class="btn sm" id="dl">Download draft JSON</button>':''}
         ${(isAdmin()||(owner&&r.status==='draft'))?'<button class="btn sm" id="del" style="color:#a3322a;border-color:#e4b4b4">Delete</button>':''}
       </div>
-      ${ isApprover() && r.status==="approved" ? `<div class="callout warn" style="margin-top:10px"><b>Assign the agreement number</b> before marking this executed.
+      ${ canNumber ? `<div class="callout warn" style="margin-top:10px"><b>Assign the agreement number</b>, then <b>download</b> the document to send for signature. Mark it <b>executed</b> once both parties have signed.
         <div class="row wrap" style="margin-top:6px"><input id="agNo" placeholder="e.g. Athena/FY25-26/001/Counterparty" value="${esc(r.agreement_no||"")}" style="max-width:360px"><button class="btn sm" id="agNoSave">Save number</button></div></div>` : "" }
     </div>
     <div class="card"><h3>History</h3>
@@ -147,9 +151,14 @@ async function viewDetail(id){
   if($("submit")) $("submit").addEventListener("click",()=>runRpc("submit_for_review",{p_id:r.id},r.id));
   if($("approve")) $("approve").addEventListener("click",()=>runRpc("approve_agreement",{p_id:r.id,p_note:null},r.id));
   if($("reject")) $("reject").addEventListener("click",()=>{ const note=prompt("Reason for rejection / changes requested:"); if(note===null) return; runRpc("reject_agreement",{p_id:r.id,p_note:note||null},r.id); });
+  if($("getdoc")) $("getdoc").addEventListener("click",()=>{
+    window.OPS.flashTop("Opening the document — use the Word or Quick PDF button inside to download");
+    viewStudio(r);
+  });
   if($("execute")) $("execute").addEventListener("click",()=>{
     if(!r.agreement_no){ alert("Please assign an Agreement Number (and click “Save number”) before marking this agreement executed."); const el=$("agNo"); if(el) el.focus(); return; }
-    window.OPS.gateThen({ kind:"agreement.execute", title:"Mark executed: "+(r.title||"")+" ["+r.agreement_no+"]", target_table:"agreements", target_id:r.id, payload:{note:null}, doneMsg:"Marked executed" }, ()=>viewDetail(r.id));
+    if(!confirm("Mark this agreement EXECUTED?\n\nDo this only once BOTH parties have signed. (When we connect the e-signature tool, this will happen automatically.)")) return;
+    runRpc("mark_executed", { p_id:r.id, p_note:null }, r.id);
   });
   if($("dl")) $("dl").addEventListener("click",()=>{ const blob=new Blob([JSON.stringify({draft:r.data},null,2)],{type:"application/json"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=(r.title||"agreement")+".json"; a.click(); });
@@ -345,7 +354,11 @@ async function submitStudioDraft(msg, f){
 window.addEventListener("message",function(ev){
   const f=$("studioFrame"); if(!f || ev.source!==f.contentWindow) return;
   const msg=ev.data||{};
-  if(msg.type==="app-ready"){ f.contentWindow.postMessage({type:"app-load", draft: currentEdit?currentEdit.data:null}, "*"); sendStudioReviewers(f); sendStudioOverrides(f); }
+  if(msg.type==="app-ready"){
+    // Carry the assigned agreement number into the document so it prints top-left.
+    const d = currentEdit ? Object.assign({}, currentEdit.data||{}, { agreementNo: currentEdit.agreement_no || (currentEdit.data&&currentEdit.data.agreementNo) || "" }) : null;
+    f.contentWindow.postMessage({type:"app-load", draft: d}, "*"); sendStudioReviewers(f); sendStudioOverrides(f);
+  }
   else if(msg.type==="app-save"){ saveStudioDraft(msg.draft); }
   else if(msg.type==="app-submit"){ submitStudioDraft(msg, f); }
   else if(msg.type==="app-save-template"){ saveStudioTemplate(msg, f); }
