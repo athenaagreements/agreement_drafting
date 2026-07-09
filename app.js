@@ -86,12 +86,19 @@ window.OPS.CAPABILITIES = CAPABILITIES;
   // IMPORTANT: only (re)initialise the app when the *logged-in user* actually changes.
   // Supabase fires onAuthStateChange for TOKEN_REFRESHED / focus / etc.; re-running
   // afterLogin() on those would re-render the screen and wipe whatever you're typing.
-  sb.auth.onAuthStateChange((_e, session)=>{ handleSession(session); });
-  sb.auth.getSession().then(({data})=>{ handleSession(data.session); });
+  sb.auth.onAuthStateChange((evt, session)=>{
+    // A password-reset link brings the user back with a temporary session and this event.
+    // Show the "set new password" screen instead of dropping them into the app.
+    if(evt === "PASSWORD_RECOVERY"){ showRecovery(); return; }
+    handleSession(session);
+  });
+  sb.auth.getSession().then(({data})=>{ if(!_inRecovery) handleSession(data.session); });
 })();
 
 let _authedUserId = null;
+let _inRecovery = false;   // true while the user is on the "set new password" screen
 function handleSession(session){
+  if(_inRecovery) return;  // don't jump into the app mid password-reset
   const u = session ? session.user : null;
   me = u; window.OPS.me = u;
   if(!u){ _authedUserId = null; showAuth(); return; }
@@ -100,7 +107,8 @@ function handleSession(session){
   afterLogin();
 }
 
-function showAuth(){ $("appView").classList.add("hidden"); $("authView").classList.remove("hidden"); }
+function showAuth(){ $("appView").classList.add("hidden"); $("resetView").classList.add("hidden"); $("authView").classList.remove("hidden"); }
+function showRecovery(){ _inRecovery = true; $("appView").classList.add("hidden"); $("authView").classList.add("hidden"); $("resetView").classList.remove("hidden"); }
 
 let _loadingProfile=false;
 async function loadProfile(){
@@ -171,6 +179,48 @@ $("auGo").addEventListener("click", async ()=>{
   $("auGo").disabled=false;
 });
 $("btnSignOut").addEventListener("click", async ()=>{ await sb.auth.signOut(); });
+
+// ---------- password reset ----------
+// Send a reset link. The link returns to THIS app URL (must be in Supabase → Auth →
+// URL Configuration → Redirect URLs), where onAuthStateChange fires PASSWORD_RECOVERY.
+$("auForgot").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  const email = $("auEmail").value.trim();
+  if(!email){ $("auErr").textContent = "Type your email above first, then click “Forgot password?”."; return; }
+  $("auErr").textContent = ""; $("auForgot").style.pointerEvents="none";
+  try{
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if(error) throw error;
+    $("auErr").innerHTML = '<span class="ok">Reset link sent. Open the email and click the link — it brings you back here to set a new password.</span>';
+  }catch(err){ $("auErr").textContent = err.message || "Could not send the reset email."; }
+  $("auForgot").style.pointerEvents="";
+});
+// Apply the new password (we already hold the temporary recovery session).
+$("rsGo").addEventListener("click", async ()=>{
+  const p1 = $("rsPass").value, p2 = $("rsPass2").value;
+  $("rsErr").textContent = "";
+  if(!p1 || p1.length < 8){ $("rsErr").textContent = "Password must be at least 8 characters."; return; }
+  if(p1 !== p2){ $("rsErr").textContent = "The two passwords do not match."; return; }
+  $("rsGo").disabled = true;
+  try{
+    const { error } = await sb.auth.updateUser({ password: p1 });
+    if(error) throw error;
+    _inRecovery = false;
+    // strip the recovery token from the address bar, then enter the app with the live session
+    try{ history.replaceState(null, "", window.location.pathname + window.location.search); }catch(_){}
+    $("resetView").classList.add("hidden");
+    const { data } = await sb.auth.getSession();
+    handleSession(data.session);
+  }catch(err){ $("rsErr").textContent = err.message || "Could not update the password."; }
+  $("rsGo").disabled = false;
+});
+$("rsCancel").addEventListener("click", async (e)=>{
+  e.preventDefault(); _inRecovery = false;
+  try{ history.replaceState(null, "", window.location.pathname + window.location.search); }catch(_){}
+  await sb.auth.signOut();
+  showAuth();
+});
 (function(){ const r=$("meRole"); if(r){ r.style.cursor="pointer"; r.title="Click to refresh your role & access"; r.addEventListener("click", ()=>{ if(me) refreshRole(); }); } })();
 
 // ---------- role + permission helpers ----------

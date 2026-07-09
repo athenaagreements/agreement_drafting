@@ -1585,10 +1585,12 @@ function newDraft(key){
   const t = tmpl(key); const e = ENTITIES[t.entity];
   // If the team has saved a permanent override for this template, start from it.
   const ov = TEMPLATE_OVERRIDES[key] || null;
-  const ovClauses = ov ? (Array.isArray(ov)?ov:ov.clauses) : null;
-  const ovAnnex   = (ov && !Array.isArray(ov) && ov.annex)   ? ov.annex   : null;
-  const ovIntro   = (ov && !Array.isArray(ov) && ov.intro)   ? ov.intro   : null;
-  const ovClosing = (ov && !Array.isArray(ov) && ov.closing!=null) ? ov.closing : null;
+  // Guard: a blank or partial saved override must NEVER wipe the built-in content.
+  const ovClausesRaw = ov ? (Array.isArray(ov)?ov:ov.clauses) : null;
+  const ovClauses = (ovClausesRaw && ovClausesRaw.length) ? ovClausesRaw : null;
+  const ovAnnex   = (ov && !Array.isArray(ov) && ov.annex && ov.annex.length)   ? ov.annex   : null;
+  const ovIntro   = (ov && !Array.isArray(ov) && ov.intro && ov.intro.length)   ? ov.intro   : null;
+  const ovClosing = (ov && !Array.isArray(ov) && ov.closing!=null && String(ov.closing).trim()) ? ov.closing : null;
   return {
     templateKey:key, entity:t.entity, cat:t.cat, cpRole:t.cpRole,
     title:t.recordTitle, docTitle:t.docTitle,

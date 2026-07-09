@@ -141,6 +141,7 @@ tr.clickable:hover{background:var(--soft-green);cursor:pointer}
     <div class="field hidden" id="auNameField"><label>Full name</label><input id="auName" placeholder="Your name"></div>
     <div class="field"><label>Email</label><input id="auEmail" type="email" placeholder="you@athenainfonomics.com"></div>
     <div class="field"><label>Password</label><input id="auPass" type="password" placeholder="••••••••"></div>
+    <p class="muted" id="auForgotWrap" style="margin:-4px 0 12px;text-align:right"><a href="#" id="auForgot">Forgot password?</a></p>
     <button class="btn green" id="auGo" style="width:100%">Sign in</button>
     <div class="err" id="auErr"></div>
     <p class="muted" style="margin-top:14px">
@@ -148,6 +149,23 @@ tr.clickable:hover{background:var(--soft-green);cursor:pointer}
       <a href="#" id="auToggle">Create an account</a>
     </p>
     <p class="muted" id="auConfigWarn" style="color:#a3322a"></p>
+  </div>
+</div>
+
+<!-- ============ SET NEW PASSWORD (password-reset link lands here) ============ -->
+<div id="resetView" class="hidden">
+  <div class="authwrap">
+    <div class="row" style="gap:8px;margin-bottom:14px">
+      <div class="accentsq" style="width:10px;height:10px;background:var(--orange);border-radius:2px"></div>
+      <div class="brand"><b>Athena Infonomics</b><span>Agreements Studio</span></div>
+    </div>
+    <h1>Set a new password</h1>
+    <p class="muted">You followed a password-reset link. Choose a new password for your account below.</p>
+    <div class="field"><label>New password</label><input id="rsPass" type="password" placeholder="At least 8 characters"></div>
+    <div class="field"><label>Confirm new password</label><input id="rsPass2" type="password" placeholder="Re-enter password"></div>
+    <button class="btn green" id="rsGo" style="width:100%">Update password &amp; sign in</button>
+    <div class="err" id="rsErr"></div>
+    <p class="muted" style="margin-top:14px"><a href="#" id="rsCancel">Back to sign in</a></p>
   </div>
 </div>
 
