@@ -126,7 +126,6 @@ function makeRegistry(cfg){
         <div class="err" id="rqErr"></div>
       </div>
       <div id="rqApproval"></div>`;
-    if(cfg.approvable && rec && window.OPS.approvals){ window.OPS.approvals.bar(cfg.table, rec, $("rqApproval"), ()=>{ sb().from(cfg.table).select("*").eq("id",rec.id).single().then(({data})=>form(data||rec)); }); }
     if(cfg.logView && rec && window.OPS.access){ window.OPS.access.log(cfg.table, rec.id, rec[cfg.fields[0].key]||""); }
     // dependent State -> District dropdowns
     $("main").querySelectorAll('select[data-depends]').forEach(dsel=>{

@@ -9,66 +9,21 @@ const { $, esc, fmt, fmtDate, money } = window.OPS.helpers;
 const sb = ()=>window.OPS.sb;
 const me = ()=>window.OPS.me;
 
-const TYPES = {
-  agreements:  { label:"Agreement", title:r=>r.title||"" },
-};
-const labelOf = (table,r)=>{ const t=TYPES[table]; if(!t) return "Item"; const l=t.label; return typeof l==="function"?l(r):l; };
-
 async function listProfilesCached(){ if(!window.OPS._profilesCache){ const {data}=await sb().from("profiles").select("id,full_name,email,role").order("full_name"); window.OPS._profilesCache=data||[]; } return window.OPS._profilesCache; }
 function nameOf(ps,id){ const p=(ps||[]).find(x=>x.id===id); return p?(p.full_name||p.email):""; }
 
 /* ---------- actions ---------- */
 async function notify(userId, message){ try{ if(userId && userId!==me().id) await sb().from("notifications").insert({ user_id:userId, message }); }catch(e){} }
 
-async function submit(table, id, approverId, title){
-  const { error }=await sb().from(table).update({ approval_status:"submitted", submitted_by:me().id, submitted_at:new Date().toISOString(), assigned_approver:approverId||null, reject_note:null }).eq("id",id);
-  if(error){ alert(error.message); return false; }
-  window.OPS.audit("submitted",table,id,title||"");
-  await notify(approverId, "Review requested: "+labelOf(table,{})+" "+(title||""));
-  window.OPS.refreshNotifs(); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
-}
 async function approve(table, id, title){
-  let msg = "Approved ✓";
-  if(table==="agreements"){
-    const { error }=await sb().rpc("approve_agreement",{p_id:id,p_note:null}); if(error){ alert(error.message); return false; }
-    // A non-admin approver only *recommends*; an admin gives final approval. Reflect that honestly.
-    msg = window.OPS.isAdmin() ? "Approved ✓" : "Recommended — sent to an admin for final approval ✓";
-  } else {
-    const { error }=await sb().from(table).update({ approval_status:"approved", approved_by:me().id, approved_at:new Date().toISOString() }).eq("id",id); if(error){ alert(error.message); return false; }
-  }
+  const { error }=await sb().rpc("approve_agreement",{p_id:id,p_note:null}); if(error){ alert(error.message); return false; }
+  // A Reviewer only *recommends*; an Admin / Approver gives final approval. Reflect that honestly.
+  const msg = window.OPS.isAdmin() ? "Approved ✓" : "Recommended — sent to an admin for final approval ✓";
   window.OPS.audit("approved",table,id,title||""); window.OPS.flashTop(msg); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
 }
 async function reject(table, id, note, title){
-  if(table==="agreements"){ const { error }=await sb().rpc("reject_agreement",{p_id:id,p_note:note||null}); if(error){ alert(error.message); return false; } }
-  else { const { error }=await sb().from(table).update({ approval_status:"rejected", approved_by:me().id, approved_at:new Date().toISOString(), reject_note:note||null }).eq("id",id); if(error){ alert(error.message); return false; } }
+  const { error }=await sb().rpc("reject_agreement",{p_id:id,p_note:note||null}); if(error){ alert(error.message); return false; }
   window.OPS.audit("rejected",table,id,note||""); window.OPS.flashTop("Rejected"); window.OPS.refreshReviewCount&&window.OPS.refreshReviewCount(); return true;
-}
-
-/* ---------- embeddable approval bar ---------- */
-// host = a DOM element; rec = the saved DB row; refresh = () => reload the form
-async function bar(table, rec, host, refresh){
-  if(!host) return;
-  const st = rec.approval_status||"draft";
-  const ps = await listProfilesCached();
-  const amApprover = rec.assigned_approver===me().id || window.OPS.isAdmin();
-  let html = `<div class="card" style="background:#fbfdf8"><div class="row wrap" style="align-items:center">
-    <b>Approval:</b> ${window.OPS.statusChip(st==="submitted"?"in_review":st)} `;
-  if(st==="draft"||st==="rejected"){
-    html += `<span class="muted">Assign reviewer</span>
-      <select id="apApprover" style="width:auto;max-width:220px">${ps.filter(p=>p.id!==me().id).map(p=>`<option value="${p.id}">${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("")}</select>
-      <button class="btn orange sm" id="apSubmit">Submit for review</button>`;
-    if(st==="rejected" && rec.reject_note) html += `<div class="muted" style="flex-basis:100%;margin-top:6px">Rejected: ${esc(rec.reject_note)}</div>`;
-  } else if(st==="submitted"){
-    html += `<span class="muted">Awaiting ${esc(nameOf(ps,rec.assigned_approver)||"reviewer")}</span>`;
-    if(amApprover) html += ` <button class="btn green sm" id="apApprove">Approve</button> <button class="btn sm" id="apReject" style="color:#a3322a;border-color:#e4b4b4">Reject…</button>`;
-  } else if(st==="approved"){
-    html += `<span class="muted">Approved by ${esc(nameOf(ps,rec.approved_by)||"")} ${rec.approved_at?("· "+fmtDate(rec.approved_at)):""}</span>`;
-  }
-  html += `</div></div>`;
-  host.innerHTML = html;
-  if($("apSubmit")) $("apSubmit").addEventListener("click",async()=>{ if(await submit(table,rec.id,$("apApprover").value,labelOf(table,rec)+" "+TYPES[table].title(rec))) refresh&&refresh(); });
-  if($("apApprove")) $("apApprove").addEventListener("click",async()=>{ if(await approve(table,rec.id,TYPES[table].title(rec))) refresh&&refresh(); });
-  if($("apReject")) $("apReject").addEventListener("click",async()=>{ const n=prompt("Reason for rejection:"); if(n===null)return; if(await reject(table,rec.id,n,TYPES[table].title(rec))) refresh&&refresh(); });
 }
 
 /* ---------- consolidated Review queue ---------- */
@@ -155,6 +110,6 @@ function openItem(it){
   if(it.table==="agreements"){ window.OPS.openTool("agreements"); if(window.OPS.routes.viewAgreementDetail) window.OPS.routes.viewAgreementDetail(it.r.id); }
 }
 
-window.OPS.approvals = { submit, approve, reject, bar };
+window.OPS.approvals = { approve, reject };
 window.OPS.routes.reviews = reviewQueue;
 })();
