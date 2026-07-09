@@ -26,6 +26,7 @@ window.OPS = { sb:null, me:null, profile:null, perms:new Set(),
   helpers:{ $, esc, fmt, fmtDate, todayISO, money, num, fyOf } };
 
 let sb=null, me=null, profile=null, signupMode=false;
+let _inRecovery = false;   // true while the user is on the "set new password" screen (password-reset link)
 const STATUS_LABEL={draft:"Draft",in_review:"In review",recommended:"Recommended",approved:"Approved",rejected:"Rejected",executed:"Executed"};
 
 /* ---------- sections + tools registry ----------
@@ -83,6 +84,10 @@ window.OPS.CAPABILITIES = CAPABILITIES;
   }
   sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
   window.OPS.sb = sb;
+  // If we arrived from a password-reset email link, show the "set new password" screen
+  // IMMEDIATELY — synchronously from the URL — so we never flash the sign-in page while
+  // Supabase processes the token in the background. Covers both link styles (see helper).
+  if(urlLooksLikeRecovery()){ showRecovery(); }
   // IMPORTANT: only (re)initialise the app when the *logged-in user* actually changes.
   // Supabase fires onAuthStateChange for TOKEN_REFRESHED / focus / etc.; re-running
   // afterLogin() on those would re-render the screen and wipe whatever you're typing.
@@ -96,7 +101,22 @@ window.OPS.CAPABILITIES = CAPABILITIES;
 })();
 
 let _authedUserId = null;
-let _inRecovery = false;   // true while the user is on the "set new password" screen
+// A password-reset email link returns the user to the app in one of two shapes depending
+// on the Supabase auth flow: implicit (#access_token=...&type=recovery in the URL hash) or
+// PKCE (?code=... in the query). We also stamp our own ?recovery=1 marker on the redirect
+// so a PKCE return is unmistakable. Any of these means "show the set-new-password screen".
+function urlLooksLikeRecovery(){
+  try{
+    const h = window.location.hash || "";
+    const q = window.location.search || "";
+    if(/(^|[#&?])type=recovery/.test(h)) return true;   // implicit-flow reset link
+    if(/[?&]recovery=1/.test(q)) return true;           // our marker (covers PKCE ?code= returns)
+    // This app uses only email+password + password-reset — no OAuth/magic-link — so a bare
+    // ?code= return can only be a reset link even if the marker above was dropped.
+    if(/[?&]code=/.test(q)) return true;
+    return false;
+  }catch(_){ return false; }
+}
 function handleSession(session){
   if(_inRecovery) return;  // don't jump into the app mid password-reset
   const u = session ? session.user : null;
@@ -189,7 +209,7 @@ $("auForgot").addEventListener("click", async (e)=>{
   if(!email){ $("auErr").textContent = "Type your email above first, then click “Forgot password?”."; return; }
   $("auErr").textContent = ""; $("auForgot").style.pointerEvents="none";
   try{
-    const redirectTo = window.location.origin + window.location.pathname;
+    const redirectTo = window.location.origin + window.location.pathname + "?recovery=1";
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if(error) throw error;
     $("auErr").innerHTML = '<span class="ok">Reset link sent. Open the email and click the link — it brings you back here to set a new password.</span>';
