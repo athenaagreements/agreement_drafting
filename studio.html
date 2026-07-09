@@ -50,7 +50,7 @@ h1,h2,h3,h4{margin:0}
 .card .acts{display:flex;gap:7px;margin-top:4px}
 /* editor */
 /* Fixed-height editor: the left nav stays put and ONLY the drafting panel scrolls. */
-.editor{display:grid;grid-template-columns:220px 1fr;gap:0;height:calc(100vh - 57px);overflow:hidden}
+.editor{display:grid;grid-template-columns:330px 1fr;gap:0;height:calc(100vh - 57px);overflow:hidden}
 .sidenav{background:#fff;border-right:1px solid var(--line);padding:16px 10px;height:100%;overflow-y:auto}
 .navitem{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;color:var(--muted)}
 .navitem:hover{background:var(--tint)}
@@ -187,21 +187,13 @@ const APP_LOGO = (window.APP_LOGO_DATAURL) || "";
 // organisation's paperwork). Used by the on-screen preview (as an <img>) and the Word
 // export (rasterised to raw PNG bytes at load, since docx needs bytes not a URL).
 const WATERMARK_URL = "icons/Water%20Mark.png";
-let WATERMARK_PNG = "";
-// Resolve once the PNG is rasterised (or fails), so the Word export can await it.
-const WATERMARK_READY = new Promise(function(resolve){
-  try{
-    const img = new Image();
-    img.onload = function(){ try{
-      const w = img.naturalWidth||1024, h = img.naturalHeight||1024;
-      const c = document.createElement("canvas"); c.width = w; c.height = h;
-      c.getContext("2d").drawImage(img, 0, 0, w, h);
-      WATERMARK_PNG = c.toDataURL("image/png");
-    }catch(e){} resolve(); };
-    img.onerror = function(){ resolve(); };
-    img.src = WATERMARK_URL;
-  }catch(e){ resolve(); }
-});
+// Raw PNG bytes for the Word export. Fetched directly (NOT via canvas): a Service-Worker-
+// served image taints a <canvas>, so toDataURL() would throw and the watermark silently
+// vanishes. fetch()→arrayBuffer avoids canvas entirely; connect-src 'self' permits it.
+let WATERMARK_BYTES = null;
+const WATERMARK_READY = (async function(){
+  try{ const r = await fetch(WATERMARK_URL); if(r && r.ok){ WATERMARK_BYTES = new Uint8Array(await r.arrayBuffer()); } }catch(e){}
+})();
 const $ = (id)=>document.getElementById(id);
 const esc = (s)=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const todayISO = ()=> new Date().toISOString().slice(0,10);
@@ -2107,10 +2099,10 @@ async function exportWord(){
   const headerChildren=[];
   // Watermark: a light-grey Athena mark, centred on the page, behind the text. Lives in the
   // header so Word repeats it on every page. Skipped gracefully if rasterisation isn't ready.
-  if(WATERMARK_PNG){
+  if(WATERMARK_BYTES && WATERMARK_BYTES.length){
     try{
       headerChildren.push(new D.Paragraph({children:[ new D.ImageRun({
-        data:b64ToBytes(WATERMARK_PNG), transformation:{width:430,height:430},
+        type:"png", data:WATERMARK_BYTES, transformation:{width:430,height:430},
         floating:{
           horizontalPosition:{ relative:D.HorizontalPositionRelativeFrom.PAGE, align:D.HorizontalPositionAlign.CENTER },
           verticalPosition:{ relative:D.VerticalPositionRelativeFrom.PAGE, align:D.VerticalPositionAlign.CENTER },

@@ -273,7 +273,9 @@ function viewStudio(rec){
       <div class="spacer"></div>
       <button class="btn sm" id="stClose">${rec?"← Back to agreement":"← Back to list"}</button>
     </div>
-    <iframe id="studioFrame" title="Document editor" style="width:100%;height:calc(100vh - 210px);border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>`;
+    <div style="position:relative;left:50%;right:50%;width:100vw;margin-left:-50vw;margin-right:-50vw;padding:0 10px;box-sizing:border-box">
+      <iframe id="studioFrame" title="Document editor" style="width:100%;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:10px;background:#fff"></iframe>
+    </div>`;
   $("studioFrame").src = "studio.html?ts="+Date.now();
   $("stClose").addEventListener("click",()=>closeStudio());
 }
