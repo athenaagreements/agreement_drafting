@@ -307,6 +307,29 @@ $("rsCancel").addEventListener("click", async (e)=>{
 });
 (function(){ const r=$("meRole"); if(r){ r.style.cursor="pointer"; r.title="Click to refresh your role & access"; r.addEventListener("click", ()=>{ if(me) refreshRole(); }); } })();
 
+// ---------- in-app change password (signed-in users; uses the live session, no email needed) ----------
+(function(){
+  const openBtn=$("btnChangePw"), ov=$("pwOverlay");
+  if(!openBtn || !ov) return;
+  const close=()=> ov.classList.add("hidden");
+  openBtn.addEventListener("click", ()=>{ $("pwNew").value=""; $("pwNew2").value=""; $("pwErr").textContent=""; ov.classList.remove("hidden"); $("pwNew").focus(); });
+  $("pwClose").addEventListener("click", close);
+  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });
+  $("pwSave").addEventListener("click", async ()=>{
+    const p1=$("pwNew").value, p2=$("pwNew2").value; $("pwErr").textContent="";
+    if(!p1 || p1.length<8){ $("pwErr").textContent="Password must be at least 8 characters."; return; }
+    if(p1!==p2){ $("pwErr").textContent="The two passwords do not match."; return; }
+    $("pwSave").disabled=true;
+    try{
+      const { error } = await sb.auth.updateUser({ password:p1 });
+      if(error) throw error;
+      $("pwErr").innerHTML='<span class="ok">Password updated.</span>';
+      setTimeout(close, 1200);
+    }catch(err){ $("pwErr").textContent = err.message || "Could not update the password."; }
+    $("pwSave").disabled=false;
+  });
+})();
+
 // ---------- role + permission helpers ----------
 const isAdmin    = ()=> profile && profile.role==="admin" && !profile.is_external;
 const isApprover = ()=> profile && !profile.is_external && (profile.role==="admin"||profile.role==="approver");
