@@ -133,8 +133,10 @@ function handleSession(session){
   afterLogin();
 }
 
-function showAuth(){ $("appView").classList.add("hidden"); $("resetView").classList.add("hidden"); $("authView").classList.remove("hidden"); }
-function showRecovery(){ _inRecovery = true; $("appView").classList.add("hidden"); $("authView").classList.add("hidden"); $("resetView").classList.remove("hidden"); }
+function hideAllAuthViews(){ ["appView","authView","resetView","otpView"].forEach(id=>$(id)&&$(id).classList.add("hidden")); }
+function showAuth(){ _inRecovery=false; hideAllAuthViews(); $("authView").classList.remove("hidden"); }
+function showRecovery(){ _inRecovery = true; hideAllAuthViews(); $("resetView").classList.remove("hidden"); }
+function showOtp(email){ _inRecovery = true; hideAllAuthViews(); if($("otpEmail")) $("otpEmail").textContent = email||""; $("otpView").classList.remove("hidden"); }
 
 let _loadingProfile=false;
 async function loadProfile(){
@@ -207,8 +209,11 @@ $("auGo").addEventListener("click", async ()=>{
 $("btnSignOut").addEventListener("click", async ()=>{ await sb.auth.signOut(); });
 
 // ---------- password reset ----------
-// Send a reset link. The link returns to THIS app URL (must be in Supabase → Auth →
-// URL Configuration → Redirect URLs), where onAuthStateChange fires PASSWORD_RECOVERY.
+// PRIMARY flow = 6-digit CODE (verifyOtp), because corporate mail security (e.g. Microsoft
+// Safe Links) pre-clicks links in emails and burns the single-use reset LINK before the user
+// can — which surfaces as "email link is invalid or has expired". A typed code is immune to that.
+// The reset email carries BOTH a code and a link (the link still works where it isn't scanned).
+let _resetEmail = "";
 $("auForgot").addEventListener("click", async (e)=>{
   e.preventDefault();
   const email = $("auEmail").value.trim();
@@ -218,10 +223,47 @@ $("auForgot").addEventListener("click", async (e)=>{
     const redirectTo = window.location.origin + window.location.pathname + "?recovery=1";
     const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
     if(error) throw error;
-    $("auErr").innerHTML = '<span class="ok">Reset link sent. Open the email and click the link — it brings you back here to set a new password.</span>';
+    _resetEmail = email;
+    showOtp(email);   // go straight to the code-entry screen
   }catch(err){ $("auErr").textContent = err.message || "Could not send the reset email."; }
   $("auForgot").style.pointerEvents="";
 });
+// Verify the 6-digit code, then set the new password.
+$("otpGo").addEventListener("click", async ()=>{
+  const code = ($("otpCode").value||"").trim().replace(/\s+/g,"");
+  const p1 = $("otpPass").value, p2 = $("otpPass2").value;
+  $("otpErr").textContent = "";
+  if(!/^\d{6}$/.test(code)){ $("otpErr").textContent = "Enter the 6-digit code from the email."; return; }
+  if(!p1 || p1.length < 8){ $("otpErr").textContent = "Password must be at least 8 characters."; return; }
+  if(p1 !== p2){ $("otpErr").textContent = "The two passwords do not match."; return; }
+  $("otpGo").disabled = true;
+  try{
+    const { error:vErr } = await sb.auth.verifyOtp({ email:_resetEmail, token:code, type:"recovery" });
+    if(vErr) throw vErr;
+    const { error:uErr } = await sb.auth.updateUser({ password: p1 });
+    if(uErr) throw uErr;
+    _inRecovery = false;
+    try{ history.replaceState(null, "", window.location.pathname); }catch(_){}
+    const { data } = await sb.auth.getSession();
+    handleSession(data.session);
+  }catch(err){
+    const m = (err && err.message) || "Could not reset the password.";
+    $("otpErr").textContent = /expired|invalid/i.test(m) ? "That code is wrong or expired. Click “Resend code” and try the newest email." : m;
+  }
+  $("otpGo").disabled = false;
+});
+$("otpResend").addEventListener("click", async (e)=>{
+  e.preventDefault(); if(!_resetEmail) return;
+  $("otpErr").textContent=""; $("otpResend").style.pointerEvents="none";
+  try{
+    const redirectTo = window.location.origin + window.location.pathname + "?recovery=1";
+    const { error } = await sb.auth.resetPasswordForEmail(_resetEmail, { redirectTo });
+    if(error) throw error;
+    $("otpErr").innerHTML = '<span class="ok">New code sent — check the latest email.</span>';
+  }catch(err){ $("otpErr").textContent = err.message || "Could not resend the code."; }
+  $("otpResend").style.pointerEvents="";
+});
+$("otpCancel").addEventListener("click", (e)=>{ e.preventDefault(); showAuth(); });
 // Apply the new password (we already hold the temporary recovery session).
 $("rsGo").addEventListener("click", async ()=>{
   const p1 = $("rsPass").value, p2 = $("rsPass2").value;

@@ -169,6 +169,24 @@ tr.clickable:hover{background:var(--soft-green);cursor:pointer}
   </div>
 </div>
 
+<!-- ============ RESET WITH 6-DIGIT CODE (reliable on corporate email that pre-scans links) ============ -->
+<div id="otpView" class="hidden">
+  <div class="authwrap">
+    <div class="row" style="gap:8px;margin-bottom:14px">
+      <div class="accentsq" style="width:10px;height:10px;background:var(--orange);border-radius:2px"></div>
+      <div class="brand"><b>Athena Infonomics</b><span>Agreements Studio</span></div>
+    </div>
+    <h1>Reset your password</h1>
+    <p class="muted">We emailed a 6-digit code to <b id="otpEmail"></b>. Enter the code and your new password. (Use the <b>code</b> — you don't need to click the link.)</p>
+    <div class="field"><label>6-digit code</label><input id="otpCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456"></div>
+    <div class="field"><label>New password</label><input id="otpPass" type="password" placeholder="At least 8 characters"></div>
+    <div class="field"><label>Confirm new password</label><input id="otpPass2" type="password" placeholder="Re-enter password"></div>
+    <button class="btn green" id="otpGo" style="width:100%">Set new password &amp; sign in</button>
+    <div class="err" id="otpErr"></div>
+    <p class="muted" style="margin-top:14px"><a href="#" id="otpResend">Resend code</a> &nbsp;·&nbsp; <a href="#" id="otpCancel">Back to sign in</a></p>
+  </div>
+</div>
+
 <!-- ============ APP ============ -->
 <div id="appView" class="hidden">
   <div class="appheader">
