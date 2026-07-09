@@ -81,7 +81,9 @@ textarea{min-height:70px;resize:vertical}
 .page{background:#fff;max-width:816px;margin:0 auto;padding:64px 72px 72px;position:relative;box-shadow:0 3px 16px rgba(0,0,0,.12);font-size:13px;line-height:1.55}
 .page .rh{position:absolute;top:20px;left:72px}
 .page .rh img{height:34px}
-.page .wm{position:absolute;top:38%;left:0;right:0;text-align:center;opacity:.05;font-size:80px;font-weight:900;color:var(--blue);transform:rotate(-18deg);pointer-events:none}
+.page .wm{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:58%;opacity:.55;pointer-events:none;z-index:0}
+.page .wm img{width:100%;display:block}
+.page .pgcontent{position:relative;z-index:1}
 .page .doc-title{text-align:center;font-size:19px;font-weight:900;color:var(--blue);letter-spacing:.5px;margin:42px 0 6px;text-transform:uppercase}
 .page .doc-sub{text-align:center;font-size:13px;color:var(--muted);margin-bottom:14px}
 .page p{margin:0 0 9px}
@@ -181,6 +183,26 @@ textarea{min-height:70px;resize:vertical}
    with only the variable items as {{merge}} fields.
    ============================================================ */
 const APP_LOGO = (window.APP_LOGO_DATAURL) || "";
+// Document watermark — the Athena pie-mark in light grey, centred behind the text.
+// Same on every organisation's paperwork. Defined once here and used by both the
+// on-screen preview (as an <img>) and the Word export (rasterised to PNG).
+const WATERMARK_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">'
+  + '<circle cx="256" cy="256" r="150" fill="#CDCFDA"/>'
+  + '<path d="M256 256 L256 106 A150 150 0 0 1 406 256 Z" fill="#FFFFFF"/>'
+  + '<circle cx="256" cy="256" r="60" fill="#FFFFFF"/></svg>';
+const WATERMARK_DATAURL = "data:image/svg+xml;base64," + btoa(WATERMARK_SVG);
+// Rasterise to PNG once at load so the Word export (which needs raster bytes) has it ready.
+let WATERMARK_PNG = "";
+(function(){ try{
+  const img = new Image();
+  img.onload = function(){ try{
+    const c = document.createElement("canvas"); c.width = 512; c.height = 512;
+    c.getContext("2d").drawImage(img, 0, 0, 512, 512);
+    WATERMARK_PNG = c.toDataURL("image/png");
+  }catch(e){} };
+  img.src = WATERMARK_DATAURL;
+}catch(e){} })();
 const $ = (id)=>document.getElementById(id);
 const esc = (s)=>(s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const todayISO = ()=> new Date().toISOString().slice(0,10);
@@ -1994,10 +2016,12 @@ function buildPageHTML(){
   const lh=letterhead(draft.entity);
   const foot=`<div class="rf"><div class="lhbar"></div><div class="fn">${esc(lh.name)}</div>${lh.lines.map(l=>`<div>${esc(l)}</div>`).join("")}</div>`;
   return `<div class="page"><div class="rh"><img src="${APP_LOGO}" alt="Athena Infonomics"></div>
-    <div class="wm"><span>Athena Infonomics</span></div>
-    <div class="doc-title">${esc(draft.docTitle)}</div>
-    ${docBodyHTML()}
-    ${foot}</div>`;
+    <div class="wm"><img src="${WATERMARK_DATAURL}" alt=""></div>
+    <div class="pgcontent">
+      <div class="doc-title">${esc(draft.docTitle)}</div>
+      ${docBodyHTML()}
+      ${foot}
+    </div></div>`;
 }
 function renderPreview(){ const s=$("previewShell"); if(s) s.innerHTML=buildPageHTML(); }
 function setDl(m){ const s=$("dlStatus"); if(s) s.textContent=m; }
@@ -2080,11 +2104,24 @@ function exportWord(){
     htmlToParas(subst(c.body)).forEach(x=>body.push(x));
   });
 
-  const header = new D.Header({children:[
-    APP_LOGO
-      ? new D.Paragraph({children:[new D.ImageRun({data:b64ToBytes(APP_LOGO),transformation:{width:150,height:70}})]})
-      : new D.Paragraph({children:[new D.TextRun({text:"Athena Infonomics",bold:true,color:BLUE,size:24})]})
-  ]});
+  const headerChildren=[];
+  // Watermark: a light-grey Athena mark, centred on the page, behind the text. Lives in the
+  // header so Word repeats it on every page. Skipped gracefully if rasterisation isn't ready.
+  if(WATERMARK_PNG){
+    try{
+      headerChildren.push(new D.Paragraph({children:[ new D.ImageRun({
+        data:b64ToBytes(WATERMARK_PNG), transformation:{width:430,height:430},
+        floating:{
+          horizontalPosition:{ relative:D.HorizontalPositionRelativeFrom.PAGE, align:D.HorizontalPositionAlign.CENTER },
+          verticalPosition:{ relative:D.VerticalPositionRelativeFrom.PAGE, align:D.VerticalPositionAlign.CENTER },
+          behindDocument:true, allowOverlap:true }
+      }) ]}));
+    }catch(e){}
+  }
+  headerChildren.push(APP_LOGO
+    ? new D.Paragraph({children:[new D.ImageRun({data:b64ToBytes(APP_LOGO),transformation:{width:150,height:70}})]})
+    : new D.Paragraph({children:[new D.TextRun({text:"Athena Infonomics",bold:true,color:BLUE,size:24})]}));
+  const header = new D.Header({children:headerChildren});
   // Footer = the Athena blue/gold bar (a 2-cell borderless table) then the letterhead text lines.
   const lh=letterhead(draft.entity);
   const noB={style:D.BorderStyle.NONE};
