@@ -82,7 +82,13 @@ window.OPS.CAPABILITIES = CAPABILITIES;
     $("auConfigWarn").textContent="⚠ config.js is missing your Supabase URL/key. See SETUP_OPS.md.";
     $("auGo").disabled=true; return;
   }
-  sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY);
+  // flowType 'implicit' makes email links (esp. password reset) deliver the session tokens
+  // directly in the URL, so they work regardless of which browser/tab opens the link — PKCE
+  // ('code' + verifier) breaks if the email opens in a different context and yields
+  // "Auth session missing" on updateUser. detectSessionInUrl lets the client pick them up.
+  sb = supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY, {
+    auth: { flowType:"implicit", detectSessionInUrl:true, persistSession:true, autoRefreshToken:true }
+  });
   window.OPS.sb = sb;
   // If we arrived from a password-reset email link, show the "set new password" screen
   // IMMEDIATELY — synchronously from the URL — so we never flash the sign-in page while
@@ -224,6 +230,22 @@ $("rsGo").addEventListener("click", async ()=>{
   if(p1 !== p2){ $("rsErr").textContent = "The two passwords do not match."; return; }
   $("rsGo").disabled = true;
   try{
+    // Make sure we actually hold the recovery session before updating. The client usually
+    // picks it up from the URL automatically, but establish it explicitly as a fallback so
+    // we never hit "Auth session missing".
+    let sess = (await sb.auth.getSession()).data.session;
+    if(!sess){
+      const hp = new URLSearchParams((window.location.hash||"").replace(/^#/,""));
+      const at = hp.get("access_token"), rt = hp.get("refresh_token");
+      if(at && rt){
+        await sb.auth.setSession({ access_token:at, refresh_token:rt });
+      } else {
+        const code = new URLSearchParams(window.location.search||"").get("code");
+        if(code && sb.auth.exchangeCodeForSession){ await sb.auth.exchangeCodeForSession(code); }
+      }
+      sess = (await sb.auth.getSession()).data.session;
+    }
+    if(!sess) throw new Error("This reset link has expired or was already used. Please request a new one from “Forgot password?”.");
     const { error } = await sb.auth.updateUser({ password: p1 });
     if(error) throw error;
     _inRecovery = false;
