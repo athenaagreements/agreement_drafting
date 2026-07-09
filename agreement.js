@@ -42,17 +42,6 @@ async function viewAgreements(){
   load("all");
 }
 
-async function viewApprovals(){
-  const m=$("main"); m.innerHTML=`<div class="eyebrow">Review queue</div><h1>Approvals</h1>
-    <p class="muted">Agreements submitted for review. Approve or reject with a note.</p><div id="listHost" class="muted">Loading…</div>`;
-  const rows=await listAgreements("review");
-  $("listHost").innerHTML = rows.length? `<table><thead><tr><th>Title</th><th>Counterparty</th><th>Owner</th><th>Submitted</th><th></th></tr></thead>
-    <tbody>${rows.map(r=>`<tr class="clickable" data-id="${r.id}"><td><b>${esc(r.title)}</b></td><td>${esc(r.counterparty||"")}</td>
-      <td>${esc((r.creator&&(r.creator.full_name||r.creator.email))||"")}</td><td class="muted">${fmt(r.updated_at)}</td>
-      <td><button class="btn sm">Open</button></td></tr>`).join("")}</tbody></table>` : '<div class="card muted">Nothing awaiting review. 🎉</div>';
-  $("listHost").querySelectorAll("[data-id]").forEach(tr=>tr.addEventListener("click",()=>viewDetail(tr.getAttribute("data-id"))));
-}
-
 function viewForm(existing){
   const e=existing||{};
   const m=$("main"); m.innerHTML=`<div class="eyebrow">${existing?"Edit":"Create"}</div><h1>${existing?"Edit agreement":"New agreement"}</h1>
@@ -383,7 +372,6 @@ window.addEventListener("message",function(ev){
 // register routes
 R.agreements = viewAgreements;
 R.new        = ()=>viewStudio(null);
-R.approvals  = viewApprovals;
 R.templates  = viewTemplates;
 R.team       = viewTeam;
 R.audit      = viewAudit;
