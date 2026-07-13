@@ -46,7 +46,7 @@ const TOOLS = [
   { key:"dashboard",   section:"dashboard", label:"Dashboard",        gate:"all" },
   // Agreements — drafting + tracking
   { key:"agreements",  section:"agreement", label:"Agreements",       gate:"all" },
-  { key:"new",         section:"agreement", label:"New agreement",    gate:"all" },
+  { key:"new",         section:"agreement", label:"Agreement Studio",  gate:"all" },
   { key:"templates",   section:"agreement", label:"Shared templates", gate:"approver" },
   // Review / Approvals — consolidated queue; everyone sees only their assigned items
   { key:"reviews",     section:"reviews",   label:"My Queue",         gate:"all" },
@@ -306,6 +306,21 @@ $("rsCancel").addEventListener("click", async (e)=>{
   showAuth();
 });
 (function(){ const r=$("meRole"); if(r){ r.style.cursor="pointer"; r.title="Click to refresh your role & access"; r.addEventListener("click", ()=>{ if(me) refreshRole(); }); } })();
+
+// ---------- header Refresh: pull the latest data into the current view without a full page reload ----------
+function refreshView(){
+  if(!me) return;
+  try{ refreshNotifs(); }catch(e){}
+  try{ refreshReviewCount(); }catch(e){}
+  const t = window.OPS.currentTool;
+  // Re-run the current view so its data re-fetches. Skip the Studio ("new") — reloading it
+  // would discard an open draft — and just refresh the counts/notifications there.
+  if(t === "home" || !t){ goHome(); }
+  else if(t !== "new"){ openTool(t); }
+  flashTop("Refreshed ✓");
+}
+window.OPS.refreshView = refreshView;
+(function(){ const b=$("btnRefresh"); if(b) b.addEventListener("click", refreshView); })();
 
 // ---------- in-app change password (signed-in users; uses the live session, no email needed) ----------
 (function(){
