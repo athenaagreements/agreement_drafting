@@ -236,8 +236,8 @@ tr.clickable:hover{background:var(--soft-green);cursor:pointer}
 <div id="pwOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60;display:flex;align-items:center;justify-content:center">
   <div style="background:#fff;max-width:420px;width:92%;border-radius:14px;border-top:5px solid var(--green);padding:22px">
     <div class="row"><h2 style="margin:0">🔑 Change password</h2><div class="spacer"></div><button class="btn sm" id="pwClose">Close</button></div>
-    <p class="muted" style="margin-top:6px">Set a new password for your account. You will stay signed in.</p>
-    <div class="field"><label>New password</label><input id="pwNew" type="password" placeholder="At least 8 characters"></div>
+    <p class="muted" style="margin-top:6px">Set a new password for your account — it must be <b>different</b> from your current (or temporary) password. You will stay signed in.</p>
+    <div class="field"><label>New password</label><input id="pwNew" type="password" placeholder="At least 8 characters — not your temporary one"></div>
     <div class="field"><label>Confirm new password</label><input id="pwNew2" type="password" placeholder="Re-enter password"></div>
     <button class="btn green" id="pwSave" style="width:100%">Update password</button>
     <div class="err" id="pwErr"></div>
@@ -246,7 +246,7 @@ tr.clickable:hover{background:var(--soft-green);cursor:pointer}
 
 <div id="notifPanel" class="hidden" style="position:fixed;top:54px;right:14px;width:340px;max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);z-index:50">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)">
-    <b>Notifications</b><button class="btn sm" id="notifMark">Mark all read</button>
+    <b>Notifications</b><div style="display:flex;gap:6px"><button class="btn sm" id="notifMark">Mark all read</button><button class="btn sm" id="notifClear" style="color:#a3322a;border-color:#e4b4b4">Clear all</button></div>
   </div>
   <div id="notifList" style="padding:6px 0"></div>
 </div>

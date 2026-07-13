@@ -338,9 +338,18 @@ window.OPS.refreshView = refreshView;
     try{
       const { error } = await sb.auth.updateUser({ password:p1 });
       if(error) throw error;
-      $("pwErr").innerHTML='<span class="ok">Password updated.</span>';
-      setTimeout(close, 1200);
-    }catch(err){ $("pwErr").textContent = err.message || "Could not update the password."; }
+      $("pwErr").innerHTML='<span class="ok">Password updated. You can keep using the app.</span>';
+      setTimeout(close, 1400);
+    }catch(err){
+      const code=(err&&err.code)||"", msg=((err&&err.message)||"").toLowerCase();
+      if(code==="same_password" || msg.includes("different from the old")){
+        $("pwErr").textContent="Please choose a password that is DIFFERENT from your current (or temporary) one.";
+      }else if(msg.includes("weak")||msg.includes("pwned")||msg.includes("should contain")||msg.includes("at least")){
+        $("pwErr").textContent=(err.message||"That password doesn't meet the requirements.");
+      }else{
+        $("pwErr").textContent=(err.message||"Could not update the password.");
+      }
+    }
     $("pwSave").disabled=false;
   });
 })();
@@ -523,7 +532,19 @@ function renderNotifs(){
   }));
 }
 function toggleNotif(){ const p=$("notifPanel"); if(p.classList.contains("hidden")){ renderNotifs(); p.classList.remove("hidden"); } else p.classList.add("hidden"); }
-async function markAllRead(){ await sb.from("notifications").update({is_read:true}).eq("user_id",me.id).eq("is_read",false); refreshNotifs(); renderNotifs(); }
+async function markAllRead(){
+  const { error }=await sb.from("notifications").update({is_read:true}).eq("user_id",me.id).eq("is_read",false);
+  if(error){ flashTop("Couldn't mark read: "+error.message); return; }
+  await refreshNotifs(); renderNotifs();   // await so the open panel re-renders as read
+}
+// Clear all: delete this user's notifications, then close the panel.
+async function clearAll(){
+  const { error }=await sb.from("notifications").delete().eq("user_id",me.id);
+  if(error){ flashTop("Couldn't clear: "+error.message); return; }
+  await refreshNotifs();
+  const p=$("notifPanel"); if(p) p.classList.add("hidden");
+  flashTop("Notifications cleared ✓");
+}
 window.OPS.refreshNotifs = refreshNotifs;
 
 // ---------- pending-approval counter (badge on the Review / Approvals tab) ----------
@@ -546,7 +567,8 @@ async function refreshReviewCount(){
 }
 window.OPS.refreshReviewCount = refreshReviewCount;
 (function(){ const b=$("bell"); if(b) b.addEventListener("click",toggleNotif);
-  const mk=$("notifMark"); if(mk) mk.addEventListener("click",markAllRead); })();
+  const mk=$("notifMark"); if(mk) mk.addEventListener("click",markAllRead);
+  const cl=$("notifClear"); if(cl) cl.addEventListener("click",clearAll); })();
 
 /* ===================== Top-bar utilities (Calculator / Calendar / Privacy) ===================== */
 function openCalc(){
