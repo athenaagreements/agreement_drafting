@@ -31,12 +31,13 @@ async function viewAgreements(){
   m.querySelectorAll("[data-f]").forEach(b=>b.addEventListener("click",()=>load(b.getAttribute("data-f"))));
   async function load(f){
     const rows=await listAgreements(f==="all"?null:f);
-    $("listHost").innerHTML = rows.length? `<table><thead><tr><th>Agreement No.</th><th>Title</th><th>Counterparty</th><th>Type</th><th>Status</th><th>Owner</th><th>Updated</th></tr></thead>
+    $("listHost").innerHTML = rows.length? `<table><thead><tr><th>Agreement No.</th><th>Title</th><th>Counterparty</th><th>Type</th><th>Group</th><th>Status</th><th>Owner</th><th>Updated</th></tr></thead>
       <tbody>${rows.map(r=>`<tr class="clickable" data-id="${r.id}">
         <td>${r.agreement_no?("<b>"+esc(r.agreement_no)+"</b>"):'<span class="muted">—</span>'}</td>
         <td><b>${esc(r.title)}</b></td><td>${esc(r.counterparty||"")}</td><td>${esc(r.category||"")}</td>
+        <td>${r.group_tag?esc(r.group_tag):'<span class="muted">—</span>'}</td>
         <td>${statusChip(r.status)}</td><td>${esc((r.creator&&(r.creator.full_name||r.creator.email))||"")}</td><td class="muted">${fmt(r.updated_at)}</td>
-      </tr>`).join("")}</tbody></table>` : '<div class="card muted">No agreements yet. Click “New agreement”.</div>';
+      </tr>`).join("")}</tbody></table>` : '<div class="card muted">No agreements yet. Click “Agreement Studio”.</div>';
     $("listHost").querySelectorAll("[data-id]").forEach(tr=>tr.addEventListener("click",()=>viewDetail(tr.getAttribute("data-id"))));
   }
   load("all");
@@ -52,6 +53,7 @@ function viewForm(existing){
       <div class="field"><label>Type</label><select id="fCat">
         ${["NDA","Service Agreement","Service Agreement + NDA","MOU","Teaming Agreement","Non-Compete Agreement","SA Amendment","Independent Contractor Agreement"].map(c=>`<option ${e.category===c?'selected':''}>${c}</option>`).join("")}</select></div>
       <div class="field"><label>Template key (optional)</label><input id="fTpl" value="${esc(e.template_key||"")}" placeholder="nda_india / nda_us …"></div>
+      <div class="field"><label>Group / Project (optional)</label><input id="fGroup" list="groupList" value="${esc(e.group_tag||"")}" placeholder="e.g. WASH, Client X, Finance"><datalist id="groupList"></datalist></div>
       <div class="field"><label>Assign approver</label><select id="fApp"></select></div>
       <div class="field full"><label>Draft data (JSON from the desktop Studio — optional)</label>
         <textarea id="fData" placeholder='Paste a "Save JSON draft" export here, or use Import.'>${e.data?esc(JSON.stringify(e.data,null,2)):""}</textarea>
@@ -67,6 +69,9 @@ function viewForm(existing){
     const approvers=ps.filter(p=>p.role==="approver"||p.role==="admin");
     $("fApp").innerHTML = '<option value="">— none —</option>'+approvers.map(p=>`<option value="${p.id}" ${e.assigned_approver===p.id?'selected':''}>${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("");
   });
+  // suggest existing Group tags
+  sb.from("agreements").select("group_tag").then(({data})=>{ const gs=[...new Set((data||[]).map(x=>x.group_tag).filter(Boolean))].sort();
+    if($("groupList")) $("groupList").innerHTML=gs.map(g=>`<option value="${esc(g)}"></option>`).join(""); });
   $("impBtn").addEventListener("click",()=>{ $("jsonImport").onchange=ev=>{ const f=ev.target.files[0]; if(!f)return;
     const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); $("fData").value=JSON.stringify(o.draft||o,null,2);
       if(!$("fTitle").value && o.draft){ $("fTitle").value=(o.draft.title||"")+" — "+((o.draft.fields&&o.draft.fields.cpName)||""); }
@@ -77,7 +82,7 @@ function viewForm(existing){
     const title=$("fTitle").value.trim(); if(!title){ $("fErr").textContent="Title is required."; return; }
     let data=null; const raw=$("fData").value.trim(); if(raw){ try{ data=JSON.parse(raw); }catch(e){ $("fErr").textContent="Draft data is not valid JSON."; return; } }
     const rec={ title, counterparty:$("fCp").value.trim(), category:$("fCat").value, template_key:$("fTpl").value.trim()||null,
-      assigned_approver:$("fApp").value||null, data };
+      group_tag:$("fGroup").value.trim()||null, assigned_approver:$("fApp").value||null, data };
     if(existing){
       const { error }=await sb.from("agreements").update(rec).eq("id",existing.id);
       if(error){ $("fErr").textContent=error.message; return; }
@@ -115,7 +120,7 @@ async function viewDetail(id){
         <div class="spacer"></div>${statusChip(r.status)}</div>
       <p class="muted">Counterparty: <b>${esc(r.counterparty||"—")}</b> · Template: ${esc(r.template_key||"—")} ·
         Owner: ${esc((r.creator&&(r.creator.full_name||r.creator.email))||"")} ·
-        Approver: ${esc((r.approver&&(r.approver.full_name||r.approver.email))||"unassigned")} · Agreement No.: <b>${esc(r.agreement_no||"—")}</b></p>
+        Approver: ${esc((r.approver&&(r.approver.full_name||r.approver.email))||"unassigned")} · Group: <b>${esc(r.group_tag||"—")}</b> · Agreement No.: <b>${esc(r.agreement_no||"—")}</b></p>
       ${r.status==="recommended"?'<div class="callout">Reviewed and <b>recommended</b> — awaiting an <b>admin</b> for final approval.</div>':''}
       <div class="row wrap" style="margin-top:8px">
         ${canEditDoc?'<button class="btn green sm" id="editdoc">✎ Open document editor</button>':''}
@@ -168,6 +173,9 @@ async function viewTeam(){
   const m=$("main"); m.innerHTML=`<div class="eyebrow">Administration</div><h1>Team &amp; access</h1>
     <div class="callout">The first person to sign up is the <b>admin</b>. Assign roles, then grant each person access to the specific <b>Administration</b> tools they need.</div>
     <h3>Roles</h3><div id="teamHost" class="muted">Loading…</div>
+    <h3 style="margin-top:22px">Agreement access</h3>
+    <p class="muted">Control what each member can do across the <b>Agreements</b> list. Set <b>View / Edit / Delete</b> independently to <b>Own only</b>, <b>Their groups</b> (list the groups), or <b>All agreements</b>. New members start at <b>Own only</b>. Admins always have full access.</p>
+    <div id="accHost" class="muted">Loading…</div>
     <h3 style="margin-top:22px">Tool access</h3>
     <p class="muted">Pick a section, tick the tools each member may use, then <b>Save changes</b>. Changes across sections are saved together. Admins always have full access.</p>
     <div class="row wrap" style="margin-bottom:8px"><label style="margin:0">Section</label><select id="permSection" style="width:auto"></select>
@@ -190,6 +198,9 @@ async function viewTeam(){
     const { error }=await sb.rpc("admin_set_approval_exempt",{ target:cb.getAttribute("data-exempt"), val:!cb.checked });
     if(error){ alert(error.message); cb.checked=!cb.checked; } else { window.OPS.flashTop("Approval setting updated ✓"); }
   }));
+
+  // ----- Agreement access: per-member View/Edit/Delete scopes + Groups -----
+  await renderAccess(ps);
 
   // ----- Tool access: select a section, edit locally, then Save -----
   const PT=window.OPS.PERMISSIONED_TOOLS, CAPS=window.OPS.CAPABILITIES||[];
@@ -223,6 +234,38 @@ async function viewTeam(){
     $("permStatus").textContent=" ✓ saved "+changes.length+" change(s)"; $("permStatus").style.color="var(--green)";
   });
   renderPerm();
+}
+
+// Per-member agreement access: View/Edit/Delete scope + Groups. Saved per row via admin_set_access.
+async function renderAccess(ps){
+  const host=$("accHost"); if(!host) return;
+  const members=(ps||[]).filter(p=>p.role!=="admin");
+  if(!members.length){ host.innerHTML='<div class="muted">No non-admin members yet. (Admins already have full access.)</div>'; return; }
+  const { data:agRows }=await sb.from("agreements").select("group_tag");
+  const groups=[...new Set((agRows||[]).map(x=>x.group_tag).filter(Boolean))].sort();
+  const opts=[["own","Own only"],["groups","Their groups"],["all","All agreements"]];
+  const sel=(name,uid,val)=>`<select data-acc="${name}" data-u="${uid}">${opts.map(o=>`<option value="${o[0]}" ${((val||"own")===o[0])?"selected":""}>${o[1]}</option>`).join("")}</select>`;
+  host.innerHTML=`<div style="overflow:auto"><table><thead><tr><th>Member</th><th>View</th><th>Edit</th><th>Delete</th><th>Groups (comma-separated)</th><th></th></tr></thead>
+    <tbody>${members.map(p=>`<tr>
+      <td><b>${esc(p.full_name||p.email)}</b><br><span class="muted">${esc(window.OPS.roleLabel(p.role))}</span></td>
+      <td>${sel("view",p.id,p.view_scope)}</td>
+      <td>${sel("edit",p.id,p.edit_scope)}</td>
+      <td>${sel("del",p.id,p.delete_scope)}</td>
+      <td><input list="accGroupList" data-acc="groups" data-u="${p.id}" value="${esc((p.access_groups||[]).join(", "))}" placeholder="only for “Their groups”" style="min-width:200px"></td>
+      <td><button class="btn green sm" data-save="${p.id}">Save</button> <span class="muted" data-st="${p.id}"></span></td>
+    </tr>`).join("")}</tbody></table>
+    <datalist id="accGroupList">${groups.map(g=>`<option value="${esc(g)}"></option>`).join("")}</datalist></div>`;
+  host.querySelectorAll("button[data-save]").forEach(btn=>btn.addEventListener("click",async()=>{
+    const uid=btn.getAttribute("data-save");
+    const val=n=>host.querySelector('[data-acc="'+n+'"][data-u="'+uid+'"]').value;
+    const groupsArr=val("groups").split(",").map(s=>s.trim()).filter(Boolean);
+    const st=host.querySelector('[data-st="'+uid+'"]');
+    btn.disabled=true; if(st){ st.textContent=" saving…"; st.style.color="var(--muted)"; }
+    const { error }=await sb.rpc("admin_set_access",{ target:uid, p_view:val("view"), p_edit:val("edit"), p_delete:val("del"), p_groups:groupsArr });
+    btn.disabled=false;
+    if(error){ if(st){ st.textContent=" "+error.message; st.style.color="var(--orange)"; } }
+    else { if(st){ st.textContent=" ✓ saved"; st.style.color="var(--green)"; } window.OPS.flashTop("Access updated ✓"); }
+  }));
 }
 
 async function viewTemplates(){
