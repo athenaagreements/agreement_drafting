@@ -69,9 +69,8 @@ function viewForm(existing){
     const approvers=ps.filter(p=>p.role==="approver"||p.role==="admin");
     $("fApp").innerHTML = '<option value="">— none —</option>'+approvers.map(p=>`<option value="${p.id}" ${e.assigned_approver===p.id?'selected':''}>${esc(p.full_name||p.email)} (${esc(window.OPS.roleLabel(p.role))})</option>`).join("");
   });
-  // suggest existing Group tags
-  sb.from("agreements").select("group_tag").then(({data})=>{ const gs=[...new Set((data||[]).map(x=>x.group_tag).filter(Boolean))].sort();
-    if($("groupList")) $("groupList").innerHTML=gs.map(g=>`<option value="${esc(g)}"></option>`).join(""); });
+  // suggest the admin-managed groups (+ any tags already in use)
+  loadGroupNames().then(gs=>{ if($("groupList")) $("groupList").innerHTML=gs.map(g=>`<option value="${esc(g)}"></option>`).join(""); });
   $("impBtn").addEventListener("click",()=>{ $("jsonImport").onchange=ev=>{ const f=ev.target.files[0]; if(!f)return;
     const r=new FileReader(); r.onload=()=>{ try{ const o=JSON.parse(r.result); $("fData").value=JSON.stringify(o.draft||o,null,2);
       if(!$("fTitle").value && o.draft){ $("fTitle").value=(o.draft.title||"")+" — "+((o.draft.fields&&o.draft.fields.cpName)||""); }
@@ -173,6 +172,9 @@ async function viewTeam(){
   const m=$("main"); m.innerHTML=`<div class="eyebrow">Administration</div><h1>Team &amp; access</h1>
     <div class="callout">The first person to sign up is the <b>admin</b>. Assign roles, then grant each person access to the specific <b>Administration</b> tools they need.</div>
     <h3>Roles</h3><div id="teamHost" class="muted">Loading…</div>
+    <h3 style="margin-top:22px">Groups</h3>
+    <p class="muted">Create the groups / projects you&rsquo;ll use to scope access (e.g. <i>WASH</i>, <i>Client X</i>, <i>Finance</i>). Tag an agreement with a group in its <b>Edit details</b>, then grant members access to their groups below. Groups you add here appear in the pick-lists.</p>
+    <div id="grpHost" class="muted">Loading…</div>
     <h3 style="margin-top:22px">Agreement access</h3>
     <p class="muted">Control what each member can do across the <b>Agreements</b> list. Set <b>View / Edit / Delete</b> independently to <b>Own only</b>, <b>Their groups</b> (list the groups), or <b>All agreements</b>. New members start at <b>Own only</b>. Admins always have full access.</p>
     <div id="accHost" class="muted">Loading…</div>
@@ -198,6 +200,9 @@ async function viewTeam(){
     const { error }=await sb.rpc("admin_set_approval_exempt",{ target:cb.getAttribute("data-exempt"), val:!cb.checked });
     if(error){ alert(error.message); cb.checked=!cb.checked; } else { window.OPS.flashTop("Approval setting updated ✓"); }
   }));
+
+  // ----- Groups: the admin-managed list of group/project tags -----
+  await renderGroups();
 
   // ----- Agreement access: per-member View/Edit/Delete scopes + Groups -----
   await renderAccess(ps);
@@ -236,13 +241,53 @@ async function viewTeam(){
   renderPerm();
 }
 
+// The list of group names to suggest everywhere: admin-managed groups UNION any
+// free-text tags already on agreements (so nothing typed earlier is ever lost).
+async function loadGroupNames(){
+  const [g,a] = await Promise.all([
+    sb.from("agreement_groups").select("name"),
+    sb.from("agreements").select("group_tag")
+  ]);
+  const set=new Set();
+  (g.data||[]).forEach(x=>{ if(x.name) set.add(x.name); });
+  (a.data||[]).forEach(x=>{ if(x.group_tag) set.add(x.group_tag); });
+  return [...set].sort((x,y)=>x.localeCompare(y));
+}
+window.OPS.loadGroupNames = loadGroupNames;
+
+// Admin-managed Groups list (create / delete). Feeds the pick-lists via loadGroupNames().
+async function renderGroups(){
+  const host=$("grpHost"); if(!host) return;
+  const { data:groups, error }=await sb.from("agreement_groups").select("*").order("name");
+  if(error){ host.innerHTML='<div class="muted">Groups need a quick database update — run the latest <b>RUN IN SUPABASE</b> file, then reload. <span style="opacity:.7">('+esc(error.message)+')</span></div>'; return; }
+  host.innerHTML=`<div class="row" style="margin:4px 0"><input id="grpNew" placeholder="New group name — e.g. WASH, Client X" style="max-width:320px"><button class="btn green sm" id="grpAdd">+ Add group</button><span id="grpMsg" class="muted"></span></div>
+    ${(groups&&groups.length)?`<table><thead><tr><th>Group</th><th>Added</th><th></th></tr></thead><tbody>
+      ${groups.map(g=>`<tr><td><b>${esc(g.name)}</b></td><td class="muted">${fmt(g.created_at)}</td><td><button class="btn sm" data-del="${g.id}" style="color:#a3322a;border-color:#e4b4b4">Delete</button></td></tr>`).join("")}
+    </tbody></table>`:'<div class="muted">No groups yet — add your first one above.</div>'}`;
+  async function add(){
+    const name=$("grpNew").value.trim(); if(!name){ return; }
+    $("grpAdd").disabled=true; $("grpMsg").textContent="";
+    const { error }=await sb.from("agreement_groups").insert({ name, created_by:me.id });
+    $("grpAdd").disabled=false;
+    if(error){ $("grpMsg").textContent = (error.code==="23505" ? " That group already exists." : " "+error.message); $("grpMsg").style.color="var(--orange)"; return; }
+    window.OPS.flashTop("Group added ✓"); renderGroups();
+  }
+  $("grpAdd").addEventListener("click",add);
+  $("grpNew").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+  host.querySelectorAll("button[data-del]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!confirm("Delete this group?\n\nAgreements already tagged with it keep the tag, and members keep it in their access list — this only removes it from the pick-list.")) return;
+    const { error }=await sb.from("agreement_groups").delete().eq("id",b.getAttribute("data-del"));
+    if(error){ alert(error.message); return; }
+    window.OPS.flashTop("Group deleted"); renderGroups();
+  }));
+}
+
 // Per-member agreement access: View/Edit/Delete scope + Groups. Saved per row via admin_set_access.
 async function renderAccess(ps){
   const host=$("accHost"); if(!host) return;
   const members=(ps||[]).filter(p=>p.role!=="admin");
   if(!members.length){ host.innerHTML='<div class="muted">No non-admin members yet. (Admins already have full access.)</div>'; return; }
-  const { data:agRows }=await sb.from("agreements").select("group_tag");
-  const groups=[...new Set((agRows||[]).map(x=>x.group_tag).filter(Boolean))].sort();
+  const groups=await loadGroupNames();
   const opts=[["own","Own only"],["groups","Their groups"],["all","All agreements"]];
   const sel=(name,uid,val)=>`<select data-acc="${name}" data-u="${uid}">${opts.map(o=>`<option value="${o[0]}" ${((val||"own")===o[0])?"selected":""}>${o[1]}</option>`).join("")}</select>`;
   host.innerHTML=`<div style="overflow:auto"><table><thead><tr><th>Member</th><th>View</th><th>Edit</th><th>Delete</th><th>Groups (comma-separated)</th><th></th></tr></thead>
