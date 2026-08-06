@@ -547,7 +547,7 @@ const SA_IN_ANNEX3 = { id:"annex_supplier", title:"Annexure  ·  Supplier Inform
 <p><b>12. Right of Audit by ATHENA</b> Without limiting any other audit rights of ATHENA, ATHENA shall have the right to review Supplier's data privacy and information security program prior to the commencement of Services and from time to time during the term of the Agreement. During the providing of the Services, on an ongoing basis from time to time and without notice, ATHENA, at its own expense, shall be entitled to perform, or to have performed, an on-site audit of Supplier's data privacy and information security program. In lieu of an on-site audit, upon request by ATHENA, Supplier agrees to complete, within thirty (30 days) of receipt, an audit questionnaire provided by ATHENA regarding Supplier's data privacy and information security program.</p>
 <p><b>13. Audit Findings.</b> Supplier shall implement any required safeguards as identified by ATHENA or by any audit of Supplier's data privacy and information security program.</p>
 <p>I commit on behalf of my organization to implement information security protocols as listed above and as informed to us in the future by ATHENA</p>
-<p>Name: &nbsp;&nbsp;&nbsp;&nbsp; Company Name:<br>Position: &nbsp;&nbsp;&nbsp;&nbsp; Date:<br><br>Signature :</p>` };
+<p>Name: {{SIGN_CP}} &nbsp;&nbsp;&nbsp;&nbsp; Company Name: {{CP_NAME}}<br>Position: {{SIGN_CP_TITLE}} &nbsp;&nbsp;&nbsp;&nbsp; Date: ________________<br><br>Signature : ________________</p>` };
 
 /* ============================================================
    SERVICES AGREEMENT — US / LLC (verbatim from "2. Template SA LLC")
@@ -723,7 +723,7 @@ const SCOPE_IN = {
   h_role:"Consultant's Role", role:"",
   h_deliv:"Deliverables & Timelines",
   cols:SCOPE_COLS.slice(), rows:[["1","","","",""]],
-  h_comp:"Compensation", feeAmount:"",
+  h_comp:"Compensation", feeType:"fixed", feeAmount:"",
   compTail:[
     `The Consultant shall invoice in accordance with the Milestone Payment Provisions. Consultant shall submit all invoices to ________ with a copy to finance@athenainfonomics.com and original to mentioned address specified in face of this Agreement. The Consultant shall include the following information on its invoices: (1) Consultant's name and complete address; (2) Date of invoice; (3) Time covered by the invoice/Time sheet; (4) itemized breakdown of costs, both cumulative and for the billing period, showing the type of cost, number of units, unit cost, and total cost for each item billed for the period.`,
     `All reimbursable expenses should be incurred with prior written permission from Athena Infonomics (Project Manager), by furnishing of proof of pertinence to the execution of the afore-mentioned scope of services. Claim format templates can be received from the email ID provided above.`,
@@ -738,7 +738,7 @@ const SCOPE_US = {
   h_role:"Consultant's Role", role:"",
   h_deliv:"Deliverables & Timelines",
   cols:SCOPE_COLS.slice(), rows:[["1","","","",""]],
-  h_comp:"Fees/Compensation", feeAmount:"",
+  h_comp:"Fees/Compensation", feeType:"fixed", feeAmount:"",
   compTail:[
     `The Consultant shall invoice in accordance with the Milestone Payment Provisions. Consultant shall submit all invoices to ________ with a copy to finance@athenainfonomics.com and original to mentioned address specified in face of this Agreement. Consultant shall include the following information on its invoices: (1) Consultant's name and complete address; (2) Date of invoice; (3) Time covered by the invoice/Time sheet; (4) itemized breakdown of costs, both cumulative and for the billing period, showing the type of cost, number of units, unit cost, and total cost for each item billed for the period.`,
     `All reimbursable expenses should be incurred with prior written permission from Athena Infonomics LLC, by furnishing of proof of pertinence to the execution of the afore-mentioned scope of services. Claim format templates can be received from the email ID provided above.`,
@@ -1536,14 +1536,16 @@ function ctx(){
   const e = ENTITIES[draft.entity] || ENTITIES.india;
   const f = draft.fields;
   const fill = (v)=> (v && String(v).trim()) ? esc(v) : `<span class="fill">____________</span>`;
+  // a name with an optional salutation prefix (Mr./Ms./M/s./Dr. …)
+  const named = (s,n)=> (n && String(n).trim()) ? esc(((s&&String(s).trim())? String(s).trim()+" ":"")+n) : `<span class="fill">____________</span>`;
   return {
     EFF: f.effectiveDate ? esc(fmtDate(f.effectiveDate)) : `<span class="fill">____________</span>`,
-    CP_NAME: fill(f.cpName), CP_ADDR: fill(f.cpAddress), CP_TYPE: fill(f.cpType),
+    CP_NAME: named(f.cpSalutation, f.cpName), CP_ADDR: fill(f.cpAddress), CP_TYPE: fill(f.cpType),
     TERM: fill(f.term), FEES: fill(f.fees), SCOPE: fill(f.scope),
     START: f.startDate?esc(fmtDate(f.startDate)):`<span class="fill">____________</span>`,
     END: f.endDate?esc(fmtDate(f.endDate)):`<span class="fill">____________</span>`,
-    SIGN_CO: fill(f.signCoName), SIGN_CO_TITLE: fill(f.signCoTitle),
-    SIGN_CP: fill(f.signCpName), SIGN_CP_TITLE: fill(f.signCpTitle),
+    SIGN_CO: named(f.signCoSalutation, f.signCoName), SIGN_CO_TITLE: fill(f.signCoTitle),
+    SIGN_CP: named(f.signCpSalutation, f.signCpName), SIGN_CP_TITLE: fill(f.signCpTitle),
     COMPANY: esc(e.legalName), COMPANY_ADDR: esc(e.address),
     // Services Agreement extras
     COORD: fill(f.coordinator), FEE_AMOUNT: fill(f.feeAmount), FEE_WORDS: fill(f.feeWords),
@@ -1611,8 +1613,8 @@ function newDraft(key){
     templateKey:key, entity:t.entity, cat:t.cat, cpRole:t.cpRole,
     title:t.recordTitle, docTitle:t.docTitle,
     fields:{
-      effectiveDate:"", cpName:"", cpAddress:"", cpType:"", term:"", coordinator:"",
-      signCoName:t.signName||e.signName, signCoTitle:t.signTitle||e.signTitle, signCpName:"", signCpTitle:""
+      effectiveDate:"", cpSalutation:"", cpName:"", cpAddress:"", cpType:"", term:"", coordinator:"",
+      signCoSalutation:"", signCoName:t.signName||e.signName, signCoTitle:t.signTitle||e.signTitle, signCpSalutation:"", signCpName:"", signCpTitle:""
     },
     clauses: (ovClauses||t.clauses).map(c=>({id:c.id,title:c.title,body:sanitizeHTML(bakeBody(c.body)),on:c.on!==false,collapsed:true})),
     annex: (ovAnnex||t.annex||[]).map(c=>({id:c.id,title:c.title,body:sanitizeHTML(bakeBody(c.body)),on:c.on!==false})),
@@ -1783,14 +1785,18 @@ function panelParties(){
       ${showTerm?`<div class="field"><label>Term <span class="hint">(number of months — fills the Term clause)</span></label><input type="text" data-f="term" value="${F('term')}" placeholder="e.g. 12"></div>`:``}
       ${showCoord?`<div class="field full"><label>Company coordinator <span class="hint">(name, designation, email — fills the Relationship of Parties clause)</span></label><input type="text" data-f="coordinator" value="${F('coordinator')}" placeholder="e.g. Jane Doe, Project Manager, jane.d@athenainfonomics.com"></div>`:``}
     </div></fieldset>
+    <datalist id="salutations"><option value="Mr."><option value="Ms."><option value="Mrs."><option value="M/s."><option value="Dr."><option value="Shri"><option value="Smt."></datalist>
     <fieldset class="fieldset"><legend>${esc(cp)} details</legend><div class="fgrid">
+      <div class="field"><label>Salutation <span class="hint">(Mr./Ms./M/s.)</span></label><input type="text" list="salutations" data-f="cpSalutation" value="${F('cpSalutation')}" placeholder="e.g. Mr. / M/s."></div>
       <div class="field full"><label>${esc(cp)} name</label><input type="text" data-f="cpName" value="${F('cpName')}" placeholder="Full legal name of the ${esc(cp).toLowerCase()}"></div>
       <div class="field full"><label>${esc(cp)} address</label><textarea data-f="cpAddress" placeholder="Office / residential address">${F('cpAddress')}</textarea></div>
       <div class="field"><label>Entity type <span class="hint">(optional)</span></label><input type="text" data-f="cpType" value="${F('cpType')}" placeholder="individual / company"></div>
     </div></fieldset>
     <fieldset class="fieldset"><legend>Signatories</legend><div class="fgrid">
+      <div class="field"><label>Company signatory — salutation</label><input type="text" list="salutations" data-f="signCoSalutation" value="${F('signCoSalutation')}" placeholder="Mr. / Ms."></div>
       <div class="field"><label>Company signatory — name</label><input type="text" data-f="signCoName" value="${F('signCoName')}"></div>
       <div class="field"><label>Company signatory — title</label><input type="text" data-f="signCoTitle" value="${F('signCoTitle')}"></div>
+      <div class="field"><label>${esc(cp)} signatory — salutation</label><input type="text" list="salutations" data-f="signCpSalutation" value="${F('signCpSalutation')}" placeholder="Mr. / Ms."></div>
       <div class="field"><label>${esc(cp)} signatory — name</label><input type="text" data-f="signCpName" value="${F('signCpName')}"></div>
       <div class="field"><label>${esc(cp)} signatory — designation</label><input type="text" data-f="signCpTitle" value="${F('signCpTitle')}"></div>
     </div></fieldset>
@@ -1834,6 +1840,16 @@ function panelAnnex(idx){
     ${rte("annex:"+idx, a.body)}
   </div>`;
 }
+// Fee structures — the compensation sentence adapts to the one chosen.
+const FEE_STRUCTURES = [
+  ["fixed",     "Fixed fee",         (amt,cur,words)=>`a fixed fee of ${amt} (${cur} ${words} Only)`],
+  ["daily",     "Daily rate",        (amt,cur,words)=>`a daily rate of ${amt} (${cur} ${words} Only) per day worked`],
+  ["monthly",   "Monthly fee",       (amt,cur,words)=>`a monthly fee of ${amt} (${cur} ${words} Only) per month`],
+  ["hourly",    "Hourly rate",       (amt,cur,words)=>`an hourly rate of ${amt} (${cur} ${words} Only) per hour`],
+  ["retainer",  "Monthly retainer",  (amt,cur,words)=>`a monthly retainer of ${amt} (${cur} ${words} Only)`],
+  ["milestone", "Milestone-based",   (amt,cur,words)=>`fees totalling ${amt} (${cur} ${words} Only), payable against the deliverables and milestones set out above`]
+];
+function feePhrase(type,amt,cur,words){ const f=FEE_STRUCTURES.find(x=>x[0]===type)||FEE_STRUCTURES[0]; return f[2](amt,cur,words); }
 function scopeWordsPreview(){ const s=draft.scope; const w=amountWords(s.feeAmount,s.system); return w?(s.currency+" "+w+" Only"):""; }
 function panelScope(){
   const s=draft.scope;
@@ -1860,10 +1876,11 @@ function panelScope(){
     <fieldset class="fieldset"><legend>Compensation</legend>
       <div class="field full"><label>Section heading</label><input type="text" data-scope="h_comp" value="${esc(s.h_comp)}"></div>
       <div class="fgrid">
-        <div class="field"><label>Fixed fee — ${esc(s.currency)} (figures)</label><input type="text" data-scope="feeAmount" id="scopeFee" value="${esc(s.feeAmount)}" placeholder="e.g. 500000"></div>
+        <div class="field"><label>Fee structure</label><select data-scope="feeType" id="scopeFeeType">${FEE_STRUCTURES.map(x=>`<option value="${x[0]}" ${((s.feeType||"fixed")===x[0])?"selected":""}>${esc(x[1])}</option>`).join("")}</select></div>
+        <div class="field"><label>Amount — ${esc(s.currency)} (figures)</label><input type="text" data-scope="feeAmount" id="scopeFee" value="${esc(s.feeAmount)}" placeholder="e.g. 500000"></div>
         <div class="field"><label>In words (auto)</label><input type="text" id="scopeFeeWords" value="${esc(scopeWordsPreview())}" readonly style="background:var(--tint)"></div>
       </div>
-      <p class="hint">Prints as: "a fixed fee of &lt;amount&gt; (${esc(s.currency)} &lt;words&gt; Only) …". The standard payment terms and the signature block are appended automatically.</p>
+      <p class="hint">The compensation sentence adapts to the fee structure you pick — fixed fee, daily / monthly / hourly rate, monthly retainer, or milestone-based. The standard payment terms and the signature block are appended automatically.</p>
     </fieldset>
   </div>`;
 }
@@ -1883,7 +1900,7 @@ function scopeToHTML(){
   const w=amountWords(s.feeAmount,s.system);
   const amt=(s.feeAmount&&String(s.feeAmount).trim())? esc(s.feeAmount) : `<span class="fill">____________</span>`;
   const words=w? esc(w) : `<span class="fill">____________</span>`;
-  h+=`<p>The Company shall pay the Consultant, for all the services mentioned above, a fixed fee of ${amt} (${esc(s.currency)} ${words} Only), inclusive of all taxes, if any, during the period of this Agreement and, that this amount is subjected to tax deduction, as per the governing laws.</p>`;
+  h+=`<p>The Company shall pay the Consultant, for all the services mentioned above, ${feePhrase(s.feeType||"fixed", amt, esc(s.currency), words)}, inclusive of all taxes, if any, during the period of this Agreement and, that this amount is subjected to tax deduction, as per the governing laws.</p>`;
   (s.compTail||[]).forEach(p=> h+=`<p>${esc(p)}</p>`);
   h+=`<p>For {{COMPANY}}</p><table class="sig"><tbody><tr><td><br><br>{{SIGN_CO}}<br>{{SIGN_CO_TITLE}}</td><td><br><br>{{SIGN_CP}}<br>{{SIGN_CP_TITLE}}</td></tr></tbody></table>`;
   return h;
